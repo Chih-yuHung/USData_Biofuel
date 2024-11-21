@@ -1,0 +1,234 @@
+---
+title: "Quick data_US"
+author: "Dr. Chih-Yu Hung"
+date: "2024-11-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(tidyverse)
+
+#US_census <- fread("qs.crops_20241107.txt/qs.crops_20241107.txt") #3-4 minutes to read
+#save(US_census,file = "US_census.R")
+#load("Inputs/US_census.R") #still need 1-2 minutes to load
+```
+
+## Filter the data
+
+Exclude the states such as AK and HI. and keep 2022 and target crop data only
+
+### Operate area
+To know the total area that could have tillage operation, filters were applied
+1. PRODN_PRACTICE_DESC = "ALL PRODUCTION PRACTICES"
+2. STATISTICCAT_DEC = "AREA HARVESTED"
+3. UNIT_DESC = "ACRES"
+4. DOMAIN_DESC = "AREA OPERATED"
+5. AGG_LEVEL_DESC = "STATE"  (to get state level data)
+
+After the filter, sum of "VALUE" is the total area (acre) for the crop in the state.
+
+```{r cars}
+
+# data_2022 <- US_census %>%
+#   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
+#   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+#   filter(YEAR %in% c(2022)) %>%
+#   filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
+#                                "WHEAT","SOYBEANS","OATS","BARLEY",
+#                                "SWEET CONR","PEAS","RYE","CANOLA",
+#                                "TRITICALE","CAMELINA"))
+
+#save(data_2022, file = "Inputs/data_2022.RData")
+
+# data_2017 <- US_census %>%
+#   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
+#   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+#   filter(YEAR %in% c(2017)) %>%
+#   filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
+#                                "WHEAT","SOYBEANS","OATS","BARLEY",
+#                                "SWEET CONR","PEAS","RYE","CANOLA",
+#                                "TRITICALE","CAMELINA"))
+# 
+# save(data_2017, file = "Inputs/data_2017.RData")
+
+
+load("Inputs/data_2022.RData")
+load("Inputs/data_2017.RData")
+
+#To filter the area data in 2022 and 2017
+data_area_2022 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Area_tot = sum(Area_tot))
+  
+
+data_area_2017 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Area_tot = sum(Area_tot))
+
+
+#To filter the production data in 2022 and 2017
+data_prod_2022 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "PRODUCTION") %>%
+  filter(UNIT_DESC %in% c("BU","TONS","LB")) %>% #they use dif units for grain and silage, or other
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Prod_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Prod_tot = as.numeric(gsub(",", "", Prod_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Prod_tot = sum(Prod_tot))
+
+
+data_prod_2017 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "PRODUCTION") %>%
+  filter(UNIT_DESC %in% c("BU","TONS","LB")) %>% #they use dif units for grain and silage, or other
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Prod_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Prod_tot = as.numeric(gsub(",", "", Prod_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Prod_tot = sum(Prod_tot))
+
+```
+
+## Propotion of meta-analysis data
+
+Here, we want to see the proportion of meta-analysis data to the US data 
+
+Here is the list of state names we have in the meta-analysis. 
+"Alabama" , "Connecticut", "Georgia", "Illinois", "Indiana"
+"Iowa", "Kansas", "Kentucky", "Michigan", "Minnesota"
+"Mississippi", "Montana", "North Dakota", "Ohio", "Pennsylvania", "Texas"
+
+
+### Based on operated area in 2017 and 2022 Census data
+```{r proportion of operated area, echo=FALSE}
+
+State_list <- c("AL", "CT", "GA", "IL", "IN", 
+                   "IA", "KS", "KY", "MI", "MN", 
+                   "MS", "MT", "ND", "OH", "PA", "TX")
+
+#To see the proportion in 2022
+data_area_state_22 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  filter(STATE_ALPHA %in% State_list) %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Area_tot_state = sum(Area_tot))
+  
+data_area_proportion_22 <- data_area_state_22 %>%
+  inner_join(data_area_2022, by = c("COMMODITY_DESC" = "COMMODITY_DESC", "SHORT_DESC" = "SHORT_DESC"))%>%
+  bind_rows(
+    tibble(
+      COMMODITY_DESC = "Total",
+      SHORT_DESC = "Total",
+      Area_tot = sum(data_area_2022$Area_tot),
+      Area_tot_state = sum(data_area_state_22$Area_tot_state))) %>%
+      mutate(prop = Area_tot_state/Area_tot ) ## 66% of operation area is included in our analysis 
+
+
+#To see the proportion in 2017
+data_area_state_17 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  filter(STATE_ALPHA %in% State_list) %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Area_tot_state = sum(Area_tot))
+  
+data_area_proportion_17 <- data_area_state_17 %>%
+  inner_join(data_area_2017, by = c("COMMODITY_DESC" = "COMMODITY_DESC", "SHORT_DESC" = "SHORT_DESC"))%>%
+  bind_rows(
+    tibble(
+      COMMODITY_DESC = "Total",
+      SHORT_DESC = "Total",
+      Area_tot = sum(data_area_2017$Area_tot),
+      Area_tot_state = sum(data_area_state_17$Area_tot_state))) %>%
+      mutate(prop = Area_tot_state/Area_tot ) ## 65% of operation area is included in our analysis 
+
+#write the tables
+write.csv(data_area_proportion_17,file="Output/Area_proprotion_2017.csv")
+write.csv(data_area_proportion_22,file="Output/Area_proprotion_2022.csv")
+
+```
+
+### Based on Production in 2017 and 2022 Census data
+```{r proportion of production, echo=FALSE}
+
+#To see the proportion in 2022
+data_prod_state_22 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "PRODUCTION") %>%
+  filter(UNIT_DESC %in% c("BU","TONS","LB")) %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  filter(STATE_ALPHA %in% State_list) %>%
+  mutate(Prod_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Prod_tot = as.numeric(gsub(",", "", Prod_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Prod_tot_state = sum(Prod_tot))
+  
+data_prod_proportion_22 <- data_prod_state_22 %>%
+  inner_join(data_prod_2022, by = c("COMMODITY_DESC" = "COMMODITY_DESC", "SHORT_DESC" = "SHORT_DESC"))%>%
+  bind_rows(
+    tibble(
+      COMMODITY_DESC = "Total",
+      SHORT_DESC = "Total",
+      Prod_tot = sum(data_prod_2022$Prod_tot),
+      Prod_tot_state = sum(data_prod_state_22$Prod_tot_state))) %>%
+      mutate(prop = Prod_tot_state/Prod_tot ) ## 69% of production is included in our analysis 
+
+
+#To see the proportion in 2017
+data_prod_state_17 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "PRODUCTION") %>%
+  filter(UNIT_DESC %in% c("BU","TONS","LB")) %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  filter(STATE_ALPHA %in% State_list) %>%
+  mutate(Prod_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Prod_tot = as.numeric(gsub(",", "", Prod_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC) %>%
+  summarise(Prod_tot_state = sum(Prod_tot))
+  
+data_prod_proportion_17 <- data_prod_state_17 %>%
+  inner_join(data_prod_2017, by = c("COMMODITY_DESC" = "COMMODITY_DESC", "SHORT_DESC" = "SHORT_DESC"))%>%
+  bind_rows(
+    tibble(
+      COMMODITY_DESC = "Total",
+      SHORT_DESC = "Total",
+      Prod_tot = sum(data_prod_2017$Prod_tot),
+      Prod_tot_state = sum(data_prod_state_17$Prod_tot_state))) %>%
+      mutate(prop = Prod_tot_state/Prod_tot ) ## 67% of production is included in our analysis 
+
+#write the tables
+write.csv(data_prod_proportion_17,file="Output/Prod_proprotion_2017.csv")
+write.csv(data_prod_proportion_22,file="Output/Prod_proprotion_2022.csv")
+
+```
