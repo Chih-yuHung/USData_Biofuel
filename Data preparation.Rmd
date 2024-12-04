@@ -129,6 +129,22 @@ The "MPE" is the total annual potential evapotranspiration during 1981-2010
 Pet <- Pet %>%
    separate(County_State, into = c("County", "State"), sep = " - ")
 
+# Define the number of days in each month for a non-leap year
+days_in_month <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+# Assuming your data frame is named 'df' and columns 3 to 362 contain the monthly values
+# Convert the relevant columns to a matrix
+monthly_values <- as.matrix(Pet[, 3:362])
+
+# Create a vector repeating 'days_in_month' 30 times to match the 360 months
+days_vector <- rep(days_in_month, times = 30)
+
+# Multiply each column by the corresponding days in month
+adjusted_values <- sweep(monthly_values, 2, days_vector, "*")
+
+# Replace the original monthly values with the adjusted values in the data frame
+Pet[, 3:362] <- adjusted_values
+
 # Calculate the average of the 1981-2010
 US_Pet <- Pet %>%
   reframe(County = County, 

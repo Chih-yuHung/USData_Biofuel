@@ -9,9 +9,13 @@ output: html_document
 library(data.table)
 library(tidyverse)
 
-#US_census <- fread("qs.crops_20241107.txt/qs.crops_20241107.txt") #3-4 minutes to read
-#save(US_census,file = "US_census.R")
-#load("Inputs/US_census.R") #still need 1-2 minutes to load
+#US_census_crop <- fread("qs.crops_20241107.txt/qs.crops_20241107.txt") #3-4 minutes to read
+#save(US_census_crop,file = "Inputs/US_census_crop.RData")
+load("Inputs/US_census_crop.RData") #still need 1-2 minutes to load
+
+#US_census <- fread("qs.census2022.txt/qs.census2022.txt")
+#save(US_census,file = "Inputs/US_census.RData")
+load("Inputs/US_census.RData")
 ```
 
 ## Filter the data
@@ -30,7 +34,7 @@ After the filter, sum of "VALUE" is the total area (acre) for the crop in the st
 
 ```{r cars}
 
-# data_2022 <- US_census %>%
+# data_2022 <- US_census_crop %>%
 #   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
 #   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
 #   filter(YEAR %in% c(2022)) %>%
@@ -38,23 +42,23 @@ After the filter, sum of "VALUE" is the total area (acre) for the crop in the st
 #                                "WHEAT","SOYBEANS","OATS","BARLEY",
 #                                "SWEET CONR","PEAS","RYE","CANOLA",
 #                                "TRITICALE","CAMELINA"))
-
-#save(data_2022, file = "Inputs/data_2022.RData")
-
-# data_2017 <- US_census %>%
-#   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
-#   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
-#   filter(YEAR %in% c(2017)) %>%
-#   filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
-#                                "WHEAT","SOYBEANS","OATS","BARLEY",
-#                                "SWEET CONR","PEAS","RYE","CANOLA",
-#                                "TRITICALE","CAMELINA"))
 # 
-# save(data_2017, file = "Inputs/data_2017.RData")
+# save(data_2022, file = "Inputs/data_crop_2022.RData")
+
+ data_2017 <- US_census_crop %>%
+   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
+  filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+  filter(YEAR %in% c(2017)) %>%
+  filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
+                               "WHEAT","SOYBEANS","OATS","BARLEY",
+                               "SWEET CONR","PEAS","RYE","CANOLA",
+                               "TRITICALE","CAMELINA"))
+
+#save(data_2017, file = "Inputs/data_crop_2017.RData")
 
 
-load("Inputs/data_2022.RData")
-load("Inputs/data_2017.RData")
+load("Inputs/data_crop_2022.RData")
+load("Inputs/data_crop_2017.RData")
 
 #To filter the area data in 2022 and 2017
 data_area_2022 <- data_2022 %>%
