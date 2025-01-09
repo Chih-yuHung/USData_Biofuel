@@ -8,14 +8,19 @@ output: html_document
 ```{r setup, include=FALSE}
 library(data.table)
 library(tidyverse)
+#2017 data
+#US_census2017 <- fread("qs.census2017.txt/qs.census2017.txt")
+#save(US_census2017,file = "Inputs/US_census2017.RData")
+load("Inputs/US_census2017.RData")
 
+#2022 data
 #US_census_crop <- fread("qs.crops_20241107.txt/qs.crops_20241107.txt") #3-4 minutes to read
 #save(US_census_crop,file = "Inputs/US_census_crop.RData")
-load("Inputs/US_census_crop.RData") #still need 1-2 minutes to load
+#load("Inputs/US_census_crop.RData") #still need 1-2 minutes to load
 
-#US_census <- fread("qs.census2022.txt/qs.census2022.txt")
-#save(US_census,file = "Inputs/US_census.RData")
-load("Inputs/US_census.RData")
+#US_census2022 <- fread("qs.census2022.txt/qs.census2022.txt")
+#save(US_census2022,file = "Inputs/US_census2022.RData")
+load("Inputs/US_census2022.RData")
 ```
 
 ## Filter the data

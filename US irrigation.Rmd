@@ -1,0 +1,16 @@
+---
+title: "US irrigation"
+author: "Dr. Chih-Yu Hung"
+date: "2025-01-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## The purpose of this MD is to calculate irrigation proportion (%) based on US census data. 
+
+The irrigation data in the US census have two part, 1. total irrigated land in the states and 2. irrigated land for specific crops.
+
+

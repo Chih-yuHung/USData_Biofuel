@@ -1,0 +1,166 @@
+---
+title: "US Climate Normal"
+author: "Dr. Chih-Yu Hung"
+date: "2024-05-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse); library(data.table)
+```
+
+## To prepare Climate normals
+
+US Climate normal for temperature (degree C), precipitation (mm), potential evapotranspiration (mm) in 1981-2010.
+The spatial scale is county and state. 
+Original data: monthly data from 1981-2010. 
+
+```{r read data}
+Temp <- fread("Climate Normals/Temperature_perCounty.csv", header = TRUE)
+Pre <- fread("Climate Normals/Precipitation_perCounty.csv", header = TRUE)
+Pet <- fread("Climate Normals/PET_perCounty.csv", header = TRUE)
+
+#Name list for missing cities
+unique_Pet <- setdiff(Pet$County_State, Temp$County_State)
+
+```
+
+
+## Data comparison
+
+The data length of Temp, Pre and Pet are not the same. This is because there are independent cities in Virgina, which are equal to county but small area. There are four cities 
+"Fairfax city - Virginia","Falls Church city - Virginia"  "Lexington city - Virginia","Manassas Park city - Virginia
+`setdiff` to see the differnences. 
+
+Fairfax city is in Fairfax county, using the same climate
+Falls church city is in Fairfax county, using the same climate
+Lexington city is in Rockbridge county, using the same climate
+Manassas Parck is in Fairfax county, using the same climate
+
+
+```{r assign climate to the four independent cities}
+#Temp
+FFcounty_T <- Temp[Temp$County_State=="Fairfax County - Virginia",]
+Rbcounty_T <- Temp[Temp$County_State=="Rockbridge County - Virginia",]
+Temp <- rbind(Temp,FFcounty_T, FFcounty_T, Rbcounty_T, FFcounty_T)
+
+#rename the cities
+n <- length(Temp$County_State)
+Temp$County_State[(n-3):n] <- unique_Pet
+
+##Precipitation
+FFcounty_P <- Pre[Pre$County_State=="Fairfax County - Virginia",]
+Rbcounty_P <- Pre[Pre$County_State=="Rockbridge County - Virginia",]
+Pre <- rbind(Pre,FFcounty_P, FFcounty_P, Rbcounty_P, FFcounty_P)
+
+#rename the cities
+Pre$County_State[(n-3):n] <- unique_Pet
+
+```
+
+
+## Temperature data
+
+Data need to be "State", "County", "MAT"
+The "MAT" is the average annual temperature during 1981-2010 
+
+```{r Temperature}
+Temp <- Temp %>%
+   separate(County_State, into = c("County", "State"), sep = " - ")
+
+# Calculate the average of the 1981-2010
+US_Temp <- Temp %>%
+  summarise(County = County, 
+            State = State, 
+            MAT = rowMeans(.[,3:362],na.rm=TRUE))
+
+
+#Growing season 
+# column_names <- colnames(Temp) 
+# Growing_season <- column_names[grepl(".*(198[1-9]|199[0-9]|200[0-9]|2010).*(05|06|07|08|09|10)$", column_names)]
+# 
+# #Table with growing seasons
+# numeric_columns <- Temp %>% 
+#   select(all_of(Growing_season))
+# 
+# # Calculate the average of the numeric columns
+# US_Temp$Temp_grow <- rowMeans(numeric_columns, na.rm = TRUE)
+
+```
+
+
+## Precipitation data
+
+Data need to be "State", "County", "MAP"
+The "Pre" is the total annual Precipitation during 1981-2010 
+
+```{r Precipitation}
+Pre <- Pre %>%
+   separate(County_State, into = c("County", "State"), sep = " - ")
+
+# Calculate the average of the 1981-2010
+US_Pre <- Pre %>%
+  reframe(County = County, 
+          State = State,
+          MAP = rowSums(.[,3:362])/30)
+
+
+# #Growing season 
+# column_names <- colnames(Pre) 
+# Growing_season <- column_names[grepl(".*(198[1-9]|199[0-9]|200[0-9]|2010).*(05|06|07|08|09|10)$", column_names)]
+# 
+# #Table with growing seasons
+# numeric_columns <- Pre %>% 
+#   select(all_of(Growing_season))
+# 
+# # Calculate the average of the numeric columns
+# US_Pre$Pre_grow <- rowSums(numeric_columns, na.rm = TRUE)/30
+
+```
+
+
+## Potential evapotranspiration data
+
+Data need to be "State", "County", "MPE"
+The "MPE" is the total annual potential evapotranspiration during 1981-2010 
+
+```{r MPE}
+Pet <- Pet %>%
+   separate(County_State, into = c("County", "State"), sep = " - ")
+
+# Define the number of days in each month for a non-leap year
+days_in_month <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+# Assuming your data frame is named 'df' and columns 3 to 362 contain the monthly values
+# Convert the relevant columns to a matrix
+monthly_values <- as.matrix(Pet[, 3:362])
+
+# Create a vector repeating 'days_in_month' 30 times to match the 360 months
+days_vector <- rep(days_in_month, times = 30)
+
+# Multiply each column by the corresponding days in month
+adjusted_values <- sweep(monthly_values, 2, days_vector, "*")
+
+# Replace the original monthly values with the adjusted values in the data frame
+Pet[, 3:362] <- adjusted_values
+
+# Calculate the average of the 1981-2010
+US_Pet <- Pet %>%
+  reframe(County = County, 
+          State = State,
+          MPE = rowSums(.[,3:362])/30)
+
+
+# #Growing season 
+# column_names <- colnames(Pre) 
+# Growing_season <- column_names[grepl(".*(198[1-9]|199[0-9]|200[0-9]|2010).*(05|06|07|08|09|10)$", column_names)]
+# 
+# #Table with growing seasons
+# numeric_columns <- Pre %>% 
+#   select(all_of(Growing_season))
+# 
+# # Calculate the average of the numeric columns
+# US_Pre$Pre_grow <- rowSums(numeric_columns, na.rm = TRUE)/30
+
+```
