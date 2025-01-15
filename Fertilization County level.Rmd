@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
+library(data.table)
 ```
 
 ## US Inorganic fertilization
@@ -18,7 +19,8 @@ This file shows how we estimate inorganic fertilization used in the US. This is 
 USA's 2024 NIR showed their national synthetic N fertilzation to cropland is 11305, 11249, and 11209 kt N in 2018, 2019, and 2020. (Table A-181 in Annex 3.12)
 
 
-
+Ref
+Brakebill, J.W. and Gronberg, J.M., 2017, County-Level Estimates of Nitrogen and Phosphorus from Commercial Fertilizer for the Conterminous United States, 1987-2012: U.S. Geological Survey data release, https://doi.org/10.5066/F7H41PKX.
 
 ```{r Fertilization County level}
 #Data from Brakebill and Gronberg 2017. (1987-2012 only) 
@@ -74,3 +76,74 @@ Fert_County_1822 <- Fert_County_2012 %>%
 
 
 ```
+
+
+### BEfore I do anything remember that this fertilzation amount is the total of all crops. I only want some crops. The sum of fertilzer of the interested crop must less than the total fertilizer in this list. 
+(CY, 2025 Jan 09)
+
+```{r retrieve survey data for fertilzation rate}
+#  US_environment <- fread("qs.environmental_20250114.txt/qs.environmental_20250114.txt")
+# # 
+# Fert_rate <- US_environment %>%
+#   filter(SOURCE_DESC == "SURVEY") %>% #keep CENSUS data only
+#   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+#   filter(YEAR %in% c(2018:2022)) %>%
+#   filter(COMMODITY_DESC %in% c("CORN","SORGHUM","GRAIN",
+#                                "WHEAT","SOYBEANS","OATS","BARLEY",
+#                                "SWEET CONR","PEAS","RYE","CANOLA",
+#                                "TRITICALE","CAMELINA")) %>%
+#   filter(DOMAINCAT_DESC == "FERTILIZER: (NITROGEN)") %>%
+#   filter(UNIT_DESC == "LB / ACRE / YEAR, AVG") %>%
+#   select(COMMODITY_DESC,CLASS_DESC,STATE_ALPHA,STATE_NAME,YEAR,VALUE)
+# save(Fert_rate, file = "Inputs/Fertrate_2018-22.RData")
+
+load("Inputs/Fertrate_2018-22.RData")
+
+Fert_rate <- Fert_rate %>%
+  filter(VALUE != "(D)") %>%
+  mutate(VALUE = as.numeric(VALUE)) %>%
+  mutate(CROP = paste(COMMODITY_DESC, CLASS_DESC, sep ="_")) %>%
+  group_by(CROP,STATE_NAME)%>%
+  summarise(RATE = mean(VALUE))
+
+```
+
+## Complete the data table
+
+There are crops and states missing because they are not included in the survey. 
+Crop: camelina, canola, rye_fall, rye_winter, triticale
+
+
+```{r complete data table}
+missing_crops <- c("CAMELINA", "CANOLA", "RYE_FALL", "RYE_WINTER", "TRITICALE")
+
+states <- toupper(c(
+  "Alabama", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", 
+  "Florida", "Georgia", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", 
+  "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", 
+  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", 
+  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", 
+  "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", 
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", 
+  "Wisconsin", "Wyoming"
+))
+
+# Create the full combination of crops and states
+expanded_data <- expand_grid(CROP = c(unique(Fert_rate$CROP), missing_crops), STATE_NAME = states)
+
+# Join the original data with the expanded grid
+Fert_rate_expanded <- expanded_data %>%
+  left_join(Fert_rate, by = c("CROP", "STATE_NAME"))
+
+
+```
+
+
+## USing the USDA Farm Production Regions
+
+USDA Farm production regions are useful to estimate fertilizer rate where is missing. Each region defines a geographic area in which crops and cropping practices are similiar. (Cooter et al., 2012)
+
+Cooter et al., 2012. doi:10.5194/bg-9-4023-2012
+
+
+

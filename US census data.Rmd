@@ -14,7 +14,7 @@ library(tidyverse)
 load("Inputs/US_census2017.RData")
 
 #2022 data
-#US_census_crop <- fread("qs.crops_20241107.txt/qs.crops_20241107.txt") #3-4 minutes to read
+US_census_crop <- fread("qs.crops_20241107.txt/qs.crops_20241107.txt") #3-4 minutes to read
 #save(US_census_crop,file = "Inputs/US_census_crop.RData")
 #load("Inputs/US_census_crop.RData") #still need 1-2 minutes to load
 
@@ -50,14 +50,14 @@ After the filter, sum of "VALUE" is the total area (acre) for the crop in the st
 # 
 # save(data_2022, file = "Inputs/data_crop_2022.RData")
 
- data_2017 <- US_census_crop %>%
-   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
-  filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
-  filter(YEAR %in% c(2017)) %>%
-  filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
-                               "WHEAT","SOYBEANS","OATS","BARLEY",
-                               "SWEET CONR","PEAS","RYE","CANOLA",
-                               "TRITICALE","CAMELINA"))
+ # data_2017 <- US_census_crop %>%
+ #  filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
+ #  filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+ #  filter(YEAR %in% c(2017)) %>%
+ #  filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
+ #                               "WHEAT","SOYBEANS","OATS","BARLEY",
+ #                               "SWEET CONR","PEAS","RYE","CANOLA",
+ #                               "TRITICALE","CAMELINA"))
 
 #save(data_2017, file = "Inputs/data_crop_2017.RData")
 
