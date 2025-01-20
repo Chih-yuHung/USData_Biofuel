@@ -102,8 +102,9 @@ load("Inputs/Fertrate_2018-22.RData")
 Fert_rate <- Fert_rate %>%
   filter(VALUE != "(D)") %>%
   mutate(VALUE = as.numeric(VALUE)) %>%
-  mutate(CROP = paste(COMMODITY_DESC, CLASS_DESC, sep ="_")) %>%
-  group_by(CROP,STATE_NAME)%>%
+  mutate(CROP = COMMODITY_DESC ) %>%
+  mutate(CLASS = CLASS_DESC) %>%
+  group_by(CROP,CLASS,STATE_NAME)%>%
   summarise(RATE = mean(VALUE))
 
 ```
@@ -111,11 +112,11 @@ Fert_rate <- Fert_rate %>%
 ## Complete the data table
 
 There are crops and states missing because they are not included in the survey. 
-Crop: camelina, canola, rye_fall, rye_winter, triticale
+Crop: camelina, canola, rye (no spring or fall in the US) triticale
 
 
 ```{r complete data table}
-missing_crops <- c("CAMELINA", "CANOLA", "RYE_FALL", "RYE_WINTER", "TRITICALE")
+missing_crops <- c("CAMELINA", "CANOLA", "RYE", "TRITICALE")
 
 states <- toupper(c(
   "Alabama", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", 
@@ -128,15 +129,163 @@ states <- toupper(c(
   "Wisconsin", "Wyoming"
 ))
 
-# Create the full combination of crops and states
-expanded_data <- expand_grid(CROP = c(unique(Fert_rate$CROP), missing_crops), STATE_NAME = states)
+# Step 1: Ensure all states and crops are included for existing crops and their classes
+# Create a full grid of all combinations of crops, classes, and states from the original data
+all_combinations <- Fert_rate %>%
+  select(CROP, CLASS) %>%
+  distinct() %>%
+  crossing(STATE_NAME = states) # Create combinations with all states
 
-# Join the original data with the expanded grid
-Fert_rate_expanded <- expanded_data %>%
-  left_join(Fert_rate, by = c("CROP", "STATE_NAME"))
+# Merge the original data with the full grid
+completed_existing_data <- all_combinations %>%
+  left_join(Fert_rate, by = c("CROP", "CLASS", "STATE_NAME"))
+
+
+# Step 2: Add missing crops for all states
+missing_data <- expand.grid(
+  CROP = missing_crops,
+  STATE_NAME = states,
+  CLASS = "ALL CLASSES",
+  RATE = NA, # Assuming RATE is missing for new rows
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Combine the completed data
+Fert_rate_expanded <- bind_rows(completed_existing_data, missing_data) %>%
+  distinct() # Remove duplicates
+
+```
+
+## Fertilizer rates for crops
+We don't have fertilizer rate for every states.  Find the major production states and their fertilizer rates. and then apply their rates to the states in the same Farm production region.  
+
+1. For corn, take Grain corn only (Silage production is only about 1% of grain)
+2. For sorghum, take Grain only
+3. For Peas, take "Dry edible" which is the total of others
+4. For Wheat, we need to seprate to SPRING, (EXCL DURUM), SPRING, DURUM and WINTER
+
+```{r}
+load("Inputs/US_census2022.RData")
+
+# Initialize an empty list to store production tables
+production_tables <- list()
+
+Production_percentage <- function(data, crop_class) {
+  # Extract crop and class information
+  crop_info <- strsplit(crop_class, "_")[[1]]
+  crop <- crop_info[1]
+  class <- ifelse(length(crop_info) > 1, crop_info[2], NA)  # Class is NA for non-WHEAT crops
+
+  # Filter the dataset for the specified crop and relevant conditions
+  filtered_data <- data %>%
+    filter(COMMODITY_DESC == crop) %>%
+    filter((COMMODITY_DESC != "CORN") | (COMMODITY_DESC == "CORN" & UTIL_PRACTICE_DESC == "GRAIN")) %>%
+    filter((COMMODITY_DESC != "SORGHUM") | (COMMODITY_DESC == "SORGHUM" & UTIL_PRACTICE_DESC == "GRAIN")) %>%
+    filter((COMMODITY_DESC != "PEAS") | (COMMODITY_DESC == "PEAS" & CLASS_DESC == "DRY EDIBLE")) %>%
+    filter(STATISTICCAT_DESC == "PRODUCTION") %>%
+    filter(AGG_LEVEL_DESC %in% c("NATIONAL", "STATE")) %>%
+    filter(DOMAIN_DESC == "TOTAL") %>%
+    mutate(VALUE = as.numeric(gsub(",", "", VALUE))) # Remove commas
+
+  # Apply additional filtering for WHEAT classes
+  if (!is.na(class)) {
+    filtered_data <- filtered_data %>%
+      filter(CLASS_DESC == class)
+  }
+
+  # Extract UNIT_DESC from filtered_data
+  unit <- unique(filtered_data$UNIT_DESC)
+  if (length(unit) > 1) {
+    warning("Multiple units found. Using the first one.")
+    unit <- unit[1]
+  }
+
+  # Calculate US total production
+  us_total <- filtered_data %>%
+    filter(LOCATION_DESC == "US TOTAL") %>%
+    summarize(Total_Production = sum(VALUE, na.rm = TRUE)) %>%
+    pull(Total_Production)
+
+  # Calculate state production percentages
+  state_production <- filtered_data %>%
+    filter(LOCATION_DESC != "US TOTAL") %>%
+    group_by(LOCATION_DESC) %>%
+    summarize(State_Production = sum(VALUE, na.rm = TRUE), .groups = "drop") %>%
+    mutate(
+      Production_Percentage = round((State_Production / us_total) * 100, 1),
+      CROP = crop_class,
+      UNIT = unit  # Add unit to the output
+    ) %>%
+    arrange(desc(Production_Percentage))
+
+  # Save the table to the list
+  production_tables[[crop_class]] <<- state_production
+}
+
+# Redefine unique_crops to include CLASS_DESC for WHEAT
+unique_crops <- Fert_rate_expanded %>%
+  mutate(CROP_CLASS = ifelse(CROP == "WHEAT", paste(CROP, CLASS, sep = "_"), CROP)) %>%
+  distinct(CROP_CLASS) %>%
+  pull(CROP_CLASS)
+
+# Calculate production percentages for all crop-class combinations
+for (crop_class in unique_crops) {
+  Production_percentage(US_census2022, crop_class)
+}
+
+# Combine all production tables into one data frame
+combined_production <- do.call(rbind, lapply(production_tables, function(df) {
+  df %>%
+    mutate(LOCATION_DESC = as.character(LOCATION_DESC)) # Ensure consistent column types
+}))
+
+# Join the combined production data back to Fert_rate_expanded
+final_result <- Fert_rate_expanded %>%
+  mutate(CROP_CLASS = ifelse(CROP == "WHEAT", paste(CROP, CLASS, sep = "_"), CROP)) %>%
+  left_join(combined_production, by = c("CROP_CLASS" = "CROP", "STATE_NAME" = "LOCATION_DESC"))
+
+# Clean up unnecessary columns, rename
+final_result <- final_result %>%
+  select(CROP,  CLASS, STATE_NAME,State_Production, Production_Percentage, RATE, UNIT) %>%
+  rename(STATE = STATE_NAME,
+         PRODUCTION = State_Production,
+         PERCENTAGE = Production_Percentage) %>%
+  # Replace NA in PRODUCTION and PERCENTAGE with 0
+  mutate(
+    PRODUCTION = replace_na(PRODUCTION, 0),
+    PERCENTAGE = replace_na(PERCENTAGE, 0)
+  ) %>%
+  # Replace NA in UNIT with the unit from the same CROP and CLASS
+  group_by(CROP, CLASS) %>%
+  mutate(
+    UNIT = if_else(is.na(UNIT), first(na.omit(UNIT)), UNIT)
+  ) %>%
+  ungroup()
+
+#Unit conversion
+# Conversion factors
+conversion_factors <- list(
+  BU = 30.027682980816,  # Bushels
+  CWT = 45.36,           # Hundredweight
+  LB = 0.4536            # Pounds
+)
+
+# Convert UNIT to kg and adjust PRODUCTION values
+Crop_Fert_Prod <- final_result %>%
+  mutate(
+    PRODUCTION_KG = case_when(
+      UNIT == "BU" ~ PRODUCTION * conversion_factors$BU,
+      UNIT == "CWT" ~ PRODUCTION * conversion_factors$CWT,
+      UNIT == "LB" ~ PRODUCTION * conversion_factors$LB,
+      TRUE ~ PRODUCTION  # Keep as is if UNIT does not match
+    ),
+    UNIT = "KG")%>%   # Update unit to KG 
+    select(CROP,  CLASS, STATE, PRODUCTION_KG, PERCENTAGE, RATE )
 
 
 ```
+
+
 
 
 ## USing the USDA Farm Production Regions
@@ -144,6 +293,15 @@ Fert_rate_expanded <- expanded_data %>%
 USDA Farm production regions are useful to estimate fertilizer rate where is missing. Each region defines a geographic area in which crops and cropping practices are similiar. (Cooter et al., 2012)
 
 Cooter et al., 2012. doi:10.5194/bg-9-4023-2012
+
+```{r Farm production regions}
+FPR <- read.csv("Fertilizer/Farm Production Regions.csv") %>%
+  mutate(STATE_NAME = toupper(State)) %>%
+  select(STATE_NAME, Region)
+
+Fert_rate_expanded <- Fert_rate_expanded %>%
+  left_join(FPR, by = "STATE_NAME")
+```
 
 
 
