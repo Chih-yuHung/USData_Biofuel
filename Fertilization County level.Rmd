@@ -297,11 +297,60 @@ Cooter et al., 2012. doi:10.5194/bg-9-4023-2012
 ```{r Farm production regions}
 FPR <- read.csv("Fertilizer/Farm Production Regions.csv") %>%
   mutate(STATE_NAME = toupper(State)) %>%
-  select(STATE_NAME, Region)
+  select(STATE_NAME, Region) %>%
+  rename(STATE = STATE_NAME,
+         REGION = Region)
 
-Fert_rate_expanded <- Fert_rate_expanded %>%
-  left_join(FPR, by = "STATE_NAME")
+Crop_Fert_Prod_FPR <- Crop_Fert_Prod %>%
+  left_join(FPR, by = "STATE")
+
+write.csv(Crop_Fert_Prod_FPR,"Outputs/Fertilizer rate.csv", row.names = FALSE)
 ```
 
 
 
+##Estimate the Fertilizer rate based on weighted production value and reported fertilizer rate
+
+```{r Estimate Fertilizer rate}
+# Define a function to calculate the weighted average and fill missing values
+fill_missing_rate <- function(data) {
+  data %>%
+    group_by(CROP, CLASS, REGION) %>% # Group by CROP, CLASS, and REGION
+    mutate(
+      RATE = ifelse(
+        is.na(RATE),
+        # Calculate weighted average for non-NA RATE values within the group
+        round(sum(RATE * PERCENTAGE, na.rm = TRUE) / sum(PERCENTAGE[!is.na(RATE)], na.rm = TRUE),1),
+        RATE
+      )
+    ) %>%
+    # Ensure rows with no valid RATE in the group remain NA
+    mutate(RATE = ifelse(is.nan(RATE), NA, RATE)) %>%
+    ungroup()
+}
+
+# Apply the function to the dataset
+Crop_Fert_Prod_FPR <- fill_missing_rate(Crop_Fert_Prod_FPR)
+
+
+# Generate summary for missing RATE
+missing_rate_summary <- Crop_Fert_Prod_FPR %>%
+  filter(is.na(RATE)) %>% # Filter rows with missing RATE
+  group_by(CROP, CLASS, REGION) %>% # Group by CROP, CLASS, and REGION
+  summarize(
+    Missing_Count = n(), # Count missing RATE values
+    Total_Percentage = sum(PERCENTAGE, na.rm = TRUE) # Sum PERCENTAGE
+  ) %>%
+  ungroup() # Ungroup the data
+
+```
+
+
+## Find fertilzer rate for missing values. 
+
+I need references to know fertilizer recommendations for each crop in each regions. Most of them from land grant university or USDA. 
+All references can be found in "US data/Fertilizer/Reference"
+
+1. Canola / Northern Plain: North Dakota 60 lb/a = 67.25 N kg/ha
+2. Camelina/ Mountain: Montana 60 N kg/ha
+3.Peas/ Mountain and Northern Plain: Montana 10lb/a = 11.21 N kg/ha
