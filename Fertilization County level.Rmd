@@ -77,7 +77,7 @@ Fert_County_1822 <- Fert_County_2012 %>%
 
 ```
 
-
+##NOTE IMPOTANT!!!!!
 ### BEfore I do anything remember that this fertilzation amount is the total of all crops. I only want some crops. The sum of fertilzer of the interested crop must less than the total fertilizer in this list. 
 (CY, 2025 Jan 09)
 
@@ -97,7 +97,7 @@ Fert_County_1822 <- Fert_County_2012 %>%
 #   select(COMMODITY_DESC,CLASS_DESC,STATE_ALPHA,STATE_NAME,YEAR,VALUE)
 # save(Fert_rate, file = "Inputs/Fertrate_2018-22.RData")
 
-load("Inputs/Fertrate_2018-22.RData")
+load("Inputs/Fertrate_2018-22.RData") #unit lb /acre
 
 Fert_rate <- Fert_rate %>%
   filter(VALUE != "(D)") %>%
@@ -164,7 +164,7 @@ We don't have fertilizer rate for every states.  Find the major production state
 3. For Peas, take "Dry edible" which is the total of others
 4. For Wheat, we need to seprate to SPRING, (EXCL DURUM), SPRING, DURUM and WINTER
 
-```{r}
+```{r prodcution percentage calculation}
 load("Inputs/US_census2022.RData")
 
 # Initialize an empty list to store production tables
@@ -365,6 +365,7 @@ All references can be found in "US data/Fertilizer/Reference"
 2. Camelina/ Mountain: Montana 60 N kg/ha
 3. Peas/ Mountain and Northern Plain: Montana 10 lb/a = 11.21 N kg/ha
 4. Triticale / Pacific: California 250 lb/a = 280.2 N kg/ha(irrigated), 30 lb/a = 33.63 N kg/ha (dryland)
+               44% land in CA is irrgated. so I used 250 * 0.44 + 30 * 0.56  = 126.8 lb/a          
 5. Triticale /Southern and Northern plain: 70 lb/a = 78.46 N kg/ha, should be applicable to Great plain area.
 6. Rye/ Northern plain: 60 lb/a = 67.25 N kg/ha
 7. Rye/ Lake: 50lb/a = 56 N kg/ha
@@ -373,5 +374,29 @@ All references can be found in "US data/Fertilizer/Reference"
 10. Rye/ Appalachia: North Carolina: 90 lb/a = 100.88 N kg/ha
 11. Rye/ Southeast: Georgia: 30+50+50 = 130 lb/a = 144.72 M kg/ha
 
+```{r merge fertilzation rate}
+Fert_Ref <- read.csv("Fertilizer/Fertilization_Rate_Reference.csv", header = T)
 
+#Merge the fert rate refernce
+Crop_Fert_Prod_FPR <- Crop_Fert_Prod_FPR %>%
+  left_join(Fert_Ref, by = c("CROP", "REGION")) %>%
+  mutate(RATE = coalesce(RATE.y, RATE.x)) %>%
+  select(-RATE.x, -RATE.y)
+
+#Estimate fert rate based on weighted national average fertilzation rate
+Crop_Fert_Prod_FPR<- Crop_Fert_Prod_FPR %>%
+  group_by(CROP, CLASS) %>%
+  mutate(
+    weighted_avg_RATE = round(sum(RATE * PERCENTAGE, na.rm = TRUE) / sum(PERCENTAGE[!is.na(RATE)], na.rm = TRUE),1),
+    RATE = ifelse(is.na(RATE), weighted_avg_RATE, RATE)
+  ) %>%
+  ungroup() %>%
+  select(-weighted_avg_RATE) %>% # Remove the temporary column
+  mutate(`RATE(kg/ha)` = round(RATE*1.12085,2))
+
+
+#write the results
+write.csv(Crop_Fert_Prod_FPR, "Outputs/Fertilization_Rate_State_Crop.csv")
+
+```
 
