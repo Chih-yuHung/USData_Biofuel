@@ -292,6 +292,8 @@ Crop_Fert_Prod <- final_result %>%
 
 USDA Farm production regions are useful to estimate fertilizer rate where is missing. Each region defines a geographic area in which crops and cropping practices are similiar. (Cooter et al., 2012)
 
+NOTE: I changed Washington State from Pacific to Mountain, since most crop production in WA is in the valleys of Rocky mountains
+
 Cooter et al., 2012. doi:10.5194/bg-9-4023-2012
 
 ```{r Farm production regions}
@@ -300,11 +302,19 @@ FPR <- read.csv("Fertilizer/Farm Production Regions.csv") %>%
   select(STATE_NAME, Region) %>%
   rename(STATE = STATE_NAME,
          REGION = Region)
+#Change WA to Mountain
+FPR <- FPR %>%
+  mutate(
+    REGION = case_when(
+      STATE == "WASHINGTON" ~ "Mountain",
+      TRUE ~REGION
+  ))
+
 
 Crop_Fert_Prod_FPR <- Crop_Fert_Prod %>%
   left_join(FPR, by = "STATE")
 
-write.csv(Crop_Fert_Prod_FPR,"Outputs/Fertilizer rate.csv", row.names = FALSE)
+#write.csv(Crop_Fert_Prod_FPR,"Outputs/Fertilizer rate.csv", row.names = FALSE)
 ```
 
 
@@ -353,4 +363,15 @@ All references can be found in "US data/Fertilizer/Reference"
 
 1. Canola / Northern Plain: North Dakota 60 lb/a = 67.25 N kg/ha
 2. Camelina/ Mountain: Montana 60 N kg/ha
-3.Peas/ Mountain and Northern Plain: Montana 10lb/a = 11.21 N kg/ha
+3. Peas/ Mountain and Northern Plain: Montana 10 lb/a = 11.21 N kg/ha
+4. Triticale / Pacific: California 250 lb/a = 280.2 N kg/ha(irrigated), 30 lb/a = 33.63 N kg/ha (dryland)
+5. Triticale /Southern and Northern plain: 70 lb/a = 78.46 N kg/ha, should be applicable to Great plain area.
+6. Rye/ Northern plain: 60 lb/a = 67.25 N kg/ha
+7. Rye/ Lake: 50lb/a = 56 N kg/ha
+8. Rye and Triticale/ Northeast: Vermont 60 lb/a = 67.25 N kg/ha
+9. Rye/ Southern plains: Oklahoma: 180 lb/a = 201.75 N kg/ha
+10. Rye/ Appalachia: North Carolina: 90 lb/a = 100.88 N kg/ha
+11. Rye/ Southeast: Georgia: 30+50+50 = 130 lb/a = 144.72 M kg/ha
+
+
+
