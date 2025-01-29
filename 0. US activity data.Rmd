@@ -1,0 +1,33 @@
+---
+title: "US activity data"
+author: "Dr. Chih-Yu Hung"
+date: "2024-12-19"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## US activity data from NIR 2024 
+
+In this RMD file, I'm describing how US collect their activity data related to SOC change and N2O emissions. I need this data (less than their requirements) 
+1. land base and history data
+2. crop-specific mineral nitrogen fertilizer rate and timing
+3. tillage practices
+4. weahter data (in other RMD files, "Climate Normals" and "Weather data preparation" )
+5. edaphic characteristics (in other RMD files)
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
