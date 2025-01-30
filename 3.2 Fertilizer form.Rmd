@@ -1,0 +1,111 @@
+---
+title: "Fertilizer types"
+author: "Dr. Chih-Yu Hung"
+date: "2025-01-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(magick)
+```
+
+## To obtain fertilizer types in different regions in the US. 
+
+The methodologies to estimate fertilizer types (% for various types) are developed by Cao et al. 
+Although it's not crop sepcific and only estimated the proportion to 2015 (and before). 
+
+Only corn has the exception. 
+Nitrogen fertilizer types of corn is estimated ny Cooter et al., 2012. 
+
+
+Ref. 
+Cao, P., Lu, C., & Yu, Z. (2018).
+Historical nitrogen fertilizer use in agricultural ecosystems of the contiguous United States during 1850–2015: application rate, timing, and fertilizer types. Earth System Science Data .https://doi.org/10.5194/essd-10-969-2018
+Cooter, E.J, Bash, J.O. Benson, V. & Ran L. (2012).
+Linking agricutural crop management and air quality models for regional to national-scale nitrogen assessments. Biogeosciens
+
+
+
+```{r fertilizer form for corn}
+Fertilizer_form_corn <- read_excel("Fertilizer/Fertilizer form corn.xlsx", 
+    sheet = "Fertilizer form") 
+#The percentages don't add up to 100% becasue it has manure. NEED to convert to Synthetic N fertilizer only
+
+Fertilizer_form_corn <- Fertilizer_form_corn %>%
+  group_by(REGION) %>%
+  mutate(PERCENTAGE = round((PERCENTAGE/ sum(PERCENTAGE)) *100,2)) %>%
+  ungroup()
+
+```
+
+## Extract the figure in Cao and calculate the proportion. 
+
+The figure is save to "Fertilizer"
+
+
+```{r fertilizer form by Cao}
+
+# Load image
+image_path <- "Fertilizer/Fertilizer proportion_Cao/Proportion_2015.png"
+img <- image_read(image_path)
+
+# Convert image to raster data
+img_data <- as.data.frame(as.raster(img))
+
+# Get image dimensions
+img_width <- image_info(img)$width
+img_height <- image_info(img)$height
+
+# Define the number of bars (regions)
+num_bars <- 7
+bar_width <- img_width / num_bars  # Approximate width of each bar
+
+# Define region names (manually update if necessary)
+region_names <- c("NGP", "MW", "NW", "NE", "SW", "SE", "SGP")
+
+# Add REGION information based on pixel position
+img_data <- img_data %>%
+  mutate(pixel_position = rep(1:img_width, each = img_height)) %>%  # Simulate x-coordinates
+  mutate(REGION = cut(pixel_position, breaks = seq(0, img_width, length.out = num_bars + 1), labels = region_names, include.lowest = TRUE)) %>%
+  select(-pixel_position)  # Remove unnecessary column
+
+
+# Define legend colors, This is from the legend png
+legend_colors <- list(
+  AnA = rgb(0, 0, 0, maxColorValue = 255),
+  AqA = rgb(255, 0, 0, maxColorValue = 255),
+  AN = rgb(0, 0, 255, maxColorValue = 255),
+  AS = rgb(255, 0, 255, maxColorValue = 255),
+  NS = rgb(0, 132, 0, maxColorValue = 255),
+  SN = rgb(0, 0, 132, maxColorValue = 255),
+  UR = rgb(132, 0, 255, maxColorValue = 255),
+  APs = rgb(132, 0, 132, maxColorValue = 255),
+  CN = rgb(132, 0, 0, maxColorValue = 255),
+  DAP = rgb(132, 132, 0, maxColorValue = 255),
+  MAP = rgb(0, 132, 132, maxColorValue = 255)
+)
+
+match_colors <- function(pixel_color, legend_colors) {
+  color_distances <- sapply(legend_colors, function(color) sum(abs(col2rgb(pixel_color) - col2rgb(color))))
+  return(names(which.min(color_distances)))  # Get the closest matching color
+}
+
+# Process image data and classify pixels
+color_counts <- img_data %>%
+  rename(pixel_color = value) %>%
+  group_by(pixel_color) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  mutate(fertilizer_type = sapply(pixel_color, match_colors, legend_colors)) %>%
+  group_by(fertilizer_type) %>%
+  summarise(proportion = sum(count) / sum(color_counts$count) * 100, .groups = 'drop')  # Convert to percentage
+
+# Display table
+print(color_counts)
+
+
+
+
+```
