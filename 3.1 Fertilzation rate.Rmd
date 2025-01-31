@@ -4,7 +4,10 @@ author: "Dr. Chih-Yu Hung"
 date: "2025-01-30"
 output: html_document
 ---
+```{r start}
+library(tidyverse)
 
+```
 ## Fertilization rate
 
 The fertilization rates are from survey data and regional fertilzation recommendation. 
@@ -314,7 +317,7 @@ Crop_Fert_Prod_FPR <- Crop_Fert_Prod_FPR %>%
   mutate(RATE = coalesce(RATE.y, RATE.x)) %>%
   select(-RATE.x, -RATE.y)
 
-#Estimate fert rate based on weighted national average fertilzation rate
+#Estimate fert rate based on weighted national average fertilization rate
 Crop_Fert_Prod_FPR<- Crop_Fert_Prod_FPR %>%
   group_by(CROP, CLASS) %>%
   mutate(
@@ -323,11 +326,14 @@ Crop_Fert_Prod_FPR<- Crop_Fert_Prod_FPR %>%
   ) %>%
   ungroup() %>%
   select(-weighted_avg_RATE) %>% # Remove the temporary column
-  mutate(`RATE(kg/ha)` = round(RATE*1.12085,2))
+  mutate(`RATE(kg/ha)` = round(RATE*1.12085,2)) #convert to kg/ ha
+
+
+
 
 
 #write the results
-write.csv(Crop_Fert_Prod_FPR, "Outputs/Fertilization_Rate_State_Crop.csv")
+write.csv(Crop_Fert_Prod_FPR, "Outputs/Fertilization_Rate_State_Crop.csv",row.names = FALSE)
 
 ```
 

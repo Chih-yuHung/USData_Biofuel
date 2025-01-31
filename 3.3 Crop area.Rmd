@@ -1,0 +1,90 @@
+---
+title: "3.3 Crop area"
+author: "Dr. Chih-Yu Hung"
+date: "2025-01-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+## Crop area
+
+The crop area data is from Cropland Data Layer (https://croplandcros.scinet.usda.gov/). 
+Thanks to Daniel Aydalla extract the crop area by appling county data. The raster data provided 30 x 30 m pixel and we converted it to ha. 
+
+```{r crop area}
+Crop_area <- read.csv("Crop/USAcrops_2018_2022_perCounty_Merge.csv")
+
+# Initial wrangling.  
+Crop_area <- Crop_area %>%
+     separate(County_State, into = c("County", "State"), sep = " - ") %>% #Seperate state and county to two columns.
+     #mutate(Year_Group = "2018_2022") %>%
+     select(-Background) #%>% #Background is the sea or the Great Lakes
+     #group_by(County,State,Year_Group) %>%
+     #summarize(across(where(is.numeric), mean, na.rm = TRUE)) %>%  # Compute mean for all numeric columns
+     #ungroup()  # Remove grouping
+
+
+#non agriculture land
+# Non_agr <- c("Pasture_Grass",	"Forest",	"Shrubland",	"Barren", "Christmas_Trees",
+#              "Other_Tree_Crops", "Clouds_No_Data",	"Developed",	"Water",	"Wetlands",
+#              "Nonag_Undefined",	"Aquaculture",	"Open_Water",	"Perennial_Ice_Snow",
+#              "Developed_Open_Space",	"Developed_Low_Intensity",	"Developed_Med_Intensity",
+#              "Developed_High_Intensity",	"Barren_1",	"Deciduous_Forest",	"Evergreen_Forest",	
+#              "Mixed_Forest",	"Shrubland_1",	"Grassland_Pasture",	"Woody_Wetlands",
+#              "Herbaceous_Wetlands")
+#vegetable
+Vegetables <- c(
+  "Sweet_Corn", "Onions", "Cucumbers", "Tomatoes", "Carrots", "Asparagus", "Garlic",
+  "Broccoli", "Peppers", "Lettuce", "Pumpkins", "Cauliflower", "Celery", "Radishes",
+  "Turnips", "Eggplants", "Gourds", "Cabbage", "Squash", "Pop_or_Orn_Corn"
+)
+
+Fruits <- c(
+  "Watermelons", "Caneberries", "Cherries", "Peaches", "Apples", "Grapes", "Citrus",
+  "Pomegranates", "Nectarines", "Plums", "Strawberries", "Apricots", "Blueberries",
+  "Cranberries", "Honeydew_Melons", "Cantaloupes", "Prunes", "Avocados"
+)
+
+Grains_exclude <- c(
+  "Rice", "Other_Small_Grains", "Oats", "Millet", "Speltz", "Buckwheat"
+)
+
+Oilseeds_exclude <- c(
+  "Sunflower", "Flaxseed", "Safflower", "Rape_Seed", "Mustard"
+)
+
+Target_crop <- c("Barley", "Camelina", "Canola", "Corn", "Peas", "Rye", "Sorghum", "Soybeans", "Triticale",
+               "Durum_Wheat", "Spring_Wheat", "Winter_Wheat"
+)
+
+# Extract column names that start with "Dbl_"
+Dbl_crop_columns <- grep("^Dbl_", colnames(Crop_area), value = TRUE)
+# Exclude columns containing "Cantaloupe" or "Lettuce_Cotton"
+Dbl_crop <- dbl_crop_columns[!grepl("Cantaloupe|Lettuce_Cotton", dbl_crop_columns)]
+Dbl_crop_exclude <- dbl_crop_columns[grepl("Cantaloupe|Lettuce_Cotton", dbl_crop_columns)]
+
+Agr_area <- Crop_area %>%
+               mutate(
+               Fruits = rowSums(select(., all_of(Fruits)), na.rm = TRUE),
+               Vegetables = rowSums(select(., all_of(Vegetables)), na.rm = TRUE),
+               Grains_exclude = rowSums(select(., all_of(Grains_exclude)), na.rm = TRUE),
+               Oilseeds_exclude = rowSums(select(., all_of(Oilseeds_exclude)), na.rm = TRUE)) %>%
+               select(
+               State, County, Year, all_of(target_crop), Fruits, Vegetables, Grains_exclude,Oilseeds_exclude,
+               all_of(Dbl_crop),all_of(Dbl_crop_exclude)) %>%
+               mutate(
+               Total_Dbl_area = rowSums(select(.,all_of(Dbl_crop)), na.rm = TRUE),    
+               Total_Ag_area =  rowSums(select(.,where(is.numeric)), na.rm = TRUE))  
+
+
+#Consider the area of Dbl crops, I will deal with major Dbl crop only (they have 92.3% of Dbl crops)
+#This include "Winter wht+soybean"(75%) , "Winter wht +corn"(7.2%)  "Winter wht + Sorghum"(6.8%),  "Triticale +corn"(3.1%) 
+             
+
+
+
+
+```
