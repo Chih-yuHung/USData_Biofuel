@@ -12,7 +12,7 @@ library(tidyverse)
 
 The fertilization rates are from survey data and regional fertilzation recommendation. 
 
-About corn, soybeans, and wheat fertilization rate. There is an Excel file from USDA ERS (https://www.ers.usda.gov/data-products/fertilizer-use-and-price), which only include fertilization rate until 2018. This is the data many research cite. I use the survey data from 2018- 2022 and take average for the fertilization rate.
+About corn, soybeans, and wheat fertilization rate. There is an Excel file from USDA ERS (https://www.ers.usda.gov/data-products/fertilizer-use-and-price), which only include fertilization rate until 2018. Although this is the data many research cite, I use the survey data from 2018- 2022 and take average for the fertilization rate.
 
 
 ```{r retrieve survey data for fertilzation rate}
@@ -333,7 +333,7 @@ Crop_Fert_Prod_FPR<- Crop_Fert_Prod_FPR %>%
 
 
 #write the results
-write.csv(Crop_Fert_Prod_FPR, "Outputs/Fertilization_Rate_State_Crop.csv",row.names = FALSE)
+#write.csv(Crop_Fert_Prod_FPR, "Outputs/Fertilization_Rate_State_Crop.csv",row.names = FALSE)
 
 ```
 

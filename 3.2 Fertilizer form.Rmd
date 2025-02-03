@@ -93,17 +93,20 @@ match_colors <- function(pixel_color, legend_colors) {
   return(names(which.min(color_distances)))  # Get the closest matching color
 }
 
+
+## Not finished. The resolution is low to distingush data, trying to reach authors for raw data (Jan 28)
+
 # Process image data and classify pixels
-color_counts <- img_data %>%
-  rename(pixel_color = value) %>%
-  group_by(pixel_color) %>%
-  summarise(count = n(), .groups = 'drop') %>%
-  mutate(fertilizer_type = sapply(pixel_color, match_colors, legend_colors)) %>%
-  group_by(fertilizer_type) %>%
-  summarise(proportion = sum(count) / sum(color_counts$count) * 100, .groups = 'drop')  # Convert to percentage
+# color_counts <- img_data %>%
+#   rename(pixel_color = value) %>%
+#   group_by(pixel_color) %>%
+#   summarise(count = n(), .groups = 'drop') %>%
+#   mutate(fertilizer_type = sapply(pixel_color, match_colors, legend_colors)) %>%
+#   group_by(fertilizer_type) %>%
+#   summarise(proportion = sum(count) / sum(color_counts$count) * 100, .groups = 'drop')  # Convert to percentage
 
 # Display table
-print(color_counts)
+#print(color_counts)
 
 
 

@@ -181,8 +181,8 @@ data_area_proportion_17 <- data_area_state_17 %>%
       mutate(prop = Area_tot_state/Area_tot ) ## 65% of operation area is included in our analysis 
 
 #write the tables
-write.csv(data_area_proportion_17,file="Output/Area_proprotion_2017.csv")
-write.csv(data_area_proportion_22,file="Output/Area_proprotion_2022.csv")
+#write.csv(data_area_proportion_17,file="Output/Area_proprotion_2017.csv")
+#write.csv(data_area_proportion_22,file="Output/Area_proprotion_2022.csv")
 
 ```
 
@@ -237,7 +237,7 @@ data_prod_proportion_17 <- data_prod_state_17 %>%
       mutate(prop = Prod_tot_state/Prod_tot ) ## 67% of production is included in our analysis 
 
 #write the tables
-write.csv(data_prod_proportion_17,file="Output/Prod_proprotion_2017.csv")
-write.csv(data_prod_proportion_22,file="Output/Prod_proprotion_2022.csv")
+#write.csv(data_prod_proportion_17,file="Output/Prod_proprotion_2017.csv")
+#write.csv(data_prod_proportion_22,file="Output/Prod_proprotion_2022.csv")
 
 ```
