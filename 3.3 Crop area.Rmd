@@ -63,8 +63,8 @@ Target_crop <- c("Barley", "Camelina", "Canola", "Corn", "Peas", "Rye", "Sorghum
 # Extract column names that start with "Dbl_"
 Dbl_crop_columns <- grep("^Dbl_", colnames(Crop_area), value = TRUE)
 # Exclude columns containing "Cantaloupe" or "Lettuce_Cotton"
-Dbl_crop <- dbl_crop_columns[!grepl("Cantaloupe|Lettuce_Cotton", dbl_crop_columns)]
-Dbl_crop_exclude <- dbl_crop_columns[grepl("Cantaloupe|Lettuce_Cotton", dbl_crop_columns)]
+Dbl_crop <- Dbl_crop_columns[!grepl("Cantaloupe|Lettuce_Cotton", Dbl_crop_columns)]
+Dbl_crop_exclude <- Dbl_crop_columns[grepl("Cantaloupe|Lettuce_Cotton", Dbl_crop_columns)]
 
 Agr_area <- Crop_area %>%
                mutate(
@@ -73,18 +73,49 @@ Agr_area <- Crop_area %>%
                Grains_exclude = rowSums(select(., all_of(Grains_exclude)), na.rm = TRUE),
                Oilseeds_exclude = rowSums(select(., all_of(Oilseeds_exclude)), na.rm = TRUE)) %>%
                select(
-               State, County, Year, all_of(target_crop), Fruits, Vegetables, Grains_exclude,Oilseeds_exclude,
+               State, County, Year, all_of(Target_crop), Fruits, Vegetables, Grains_exclude,Oilseeds_exclude,
                all_of(Dbl_crop),all_of(Dbl_crop_exclude)) %>%
                mutate(
                Total_Dbl_area = rowSums(select(.,all_of(Dbl_crop)), na.rm = TRUE),    
-               Total_Ag_area =  rowSums(select(.,where(is.numeric)), na.rm = TRUE))  
+               Total_Ag_area =  rowSums(select(.,where(is.numeric)), na.rm = TRUE),
+               Dbl_percentage = round(Total_Dbl_area/Total_Ag_area *100,1))  
 
 
 #Consider the area of Dbl crops, I will deal with major Dbl crop only (they have 92.3% of Dbl crops)
 #This include "Winter wht+soybean"(75%) , "Winter wht +corn"(7.2%)  "Winter wht + Sorghum"(6.8%),  "Triticale +corn"(3.1%) 
-             
+          
+
+```
 
 
 
+
+```{r Dbl crop check out}
+# Define the function
+list_high_dbl_crops <- function(data) {
+  # Define the columns to check
+  target_dbl_crops <- c(
+    "Dbl_Crop_WinWht_Soybeans",
+    "Dbl_Crop_WinWht_Corn",
+    "Dbl_Crop_WinWht_Sorghum",
+    "Dbl_Crop_Triticale_Corn"
+  )
+  
+  # Filter rows where any of these columns have a value > 50
+  filtered_data <- data %>%
+    filter(if_any(all_of(target_dbl_crops), ~ . > 1000)) %>%
+    select(State, County, all_of(target_dbl_crops)) %>%
+    distinct() # Remove duplicate entries
+
+  return(filtered_data)
+}
+
+# Apply the function to Agr_area
+high_dbl_crop_locations <- list_high_dbl_crops(Agr_area)
+
+# View the result
+print(high_dbl_crop_locations)
+
+sum(high_dbl_crop_locations[,3:6])
 
 ```

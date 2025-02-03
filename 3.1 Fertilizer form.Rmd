@@ -1,0 +1,46 @@
+---
+title: "Fertilizer types"
+author: "Dr. Chih-Yu Hung"
+date: "2025-01-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+```
+
+## To obtain fertilizer types in different regions in the US. 
+
+The methodologies to estimate fertilizer types (% for various types) are developed by Cao et al. 
+Although it's not crop sepcific and only estimated the proportion to 2015 (and before). 
+
+Only corn has the exception. 
+Nitrogen fertilizer types of corn is estimated ny Cooter et al., 2012. 
+
+
+Ref. 
+Cao, P., Lu, C., & Yu, Z. (2018).
+Historical nitrogen fertilizer use in agricultural ecosystems of the contiguous United States during 1850–2015: application rate, timing, and fertilizer types. Earth System Science Data .https://doi.org/10.5194/essd-10-969-2018
+Cooter, E.J, Bash, J.O. Benson, V. & Ran L. (2012).
+Linking agricutural crop management and air quality models for regional to national-scale nitrogen assessments. Biogeosciens
+
+
+
+```{r fertilizer form for corn}
+Fertilizer_form_corn <- read_excel("Fertilizer/Fertilizer form corn.xlsx", 
+    sheet = "Fertilizer form") 
+#The percentages don't add up to 100% becasue it has manure. NEED to convert to Synthetic N fertilizer only
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

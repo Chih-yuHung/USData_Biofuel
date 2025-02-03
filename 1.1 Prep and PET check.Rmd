@@ -1,0 +1,71 @@
+---
+title: "1.1 Prep and PET check"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse); library(data.table)
+
+Rain <- fread("Climate Normals/Precipitation_perCounty.csv", header = TRUE)
+Rain <- Rain %>%
+   separate(County_State, into = c("County", "State"), sep = " - ")
+```
+
+## Check interannual distribution of Precipitation and PET 
+
+The purpose is to know if the precipitation and PET are not evenly distributed between growing seasons (April to September) and non-growing seasons (Nov-April).
+
+```{r }
+# Function to calculate the 30-year average of precipitation in growing season vs. non-growing season.
+calculate_30y_avg_rain <- function(data) {
+  # Define the growing season months (May to October) and non-growing season (November to April)
+  months_grow <- sprintf("%02d", 5:10)  # May to October, padded with zero
+  months_nongrow <- sprintf("%02d", c(1:4, 11:12))  # November to April
+
+  # Define the years range (1981-2010)
+  years <- 1981:2010
+
+  # Initialize empty matrices to store the annual totals for growing and non-growing seasons
+  annual_totals_grow <- matrix(NA, nrow = nrow(data), ncol = length(years))
+  annual_totals_nongrow <- matrix(NA, nrow = nrow(data), ncol = length(years))
+  colnames(annual_totals_grow) <- years
+  colnames(annual_totals_nongrow) <- years
+
+  # Loop through each year and sum the precipitation for both seasons
+  for (year in years) {
+    # Column names for growing and non-growing seasons
+    cols_grow <- paste0("P_", year, months_grow)
+    cols_nongrow <- paste0("P_", year, months_nongrow)
+
+    # Check if all required columns exist in the data
+    if (all(cols_grow %in% names(data))) {
+      annual_totals_grow[, as.character(year)] <- rowSums(data[, cols_grow], na.rm = TRUE)
+    } else {
+      warning(paste("Some growing season columns for year", year, "are missing. Skipping."))
+    }
+
+    if (all(cols_nongrow %in% names(data))) {
+      annual_totals_nongrow[, as.character(year)] <- rowSums(data[, cols_nongrow], na.rm = TRUE)
+    } else {
+      warning(paste("Some non-growing season columns for year", year, "are missing. Skipping."))
+    }
+  }
+
+  # Calculate the 30-year average for each row (county/state)
+  data$Avg_P_grow <- rowMeans(annual_totals_grow, na.rm = TRUE)
+  data$Avg_P_nongrow <- rowMeans(annual_totals_nongrow, na.rm = TRUE)
+
+  return(data)
+}
+
+# Apply function and select relevant columns
+Rain.avg <- calculate_30y_avg_rain(Rain) %>%
+            select(County, State, Avg_P_grow, Avg_P_nongrow)
+
+
+
+```
+
