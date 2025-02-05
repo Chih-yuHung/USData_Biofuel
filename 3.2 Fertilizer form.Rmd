@@ -20,6 +20,8 @@ Although it's not crop sepcific and only estimated the proportion to 2015 (and b
 Only corn has the exception. 
 Nitrogen fertilizer types of corn is estimated ny Cooter et al., 2012. 
 
+Thanks to Prof. Lu provided their data. (Feb 4, 2025)
+
 
 Ref. 
 Cao, P., Lu, C., & Yu, Z. (2018).
@@ -34,11 +36,32 @@ Fertilizer_form_corn <- read_excel("Fertilizer/Fertilizer form corn.xlsx",
     sheet = "Fertilizer form") 
 #The percentages don't add up to 100% becasue it has manure. NEED to convert to Synthetic N fertilizer only
 
+#Use Farm production region (FPR from 3.1 Fertilzation rate.Rmd)
+FPR <- read.csv("Fertilizer/Farm Production Regions.csv") %>%
+  mutate(STATE_NAME = toupper(State)) %>%
+  select(STATE_NAME, Region) %>%
+  rename(STATE = STATE_NAME,
+         REGION = Region)
+#Change WA to Mountain
+FPR <- FPR %>%
+  mutate(
+    REGION = case_when(
+      STATE == "WASHINGTON" ~ "Mountain",
+      TRUE ~REGION
+  ))
+
+#calculate the percentage(with manure to N fertilizer only) and complete Corn table
 Fertilizer_form_corn <- Fertilizer_form_corn %>%
   group_by(REGION) %>%
-  mutate(PERCENTAGE = round((PERCENTAGE/ sum(PERCENTAGE)) *100,2)) %>%
-  ungroup()
+  mutate(PERCENTAGE = (PERCENTAGE/ sum(PERCENTAGE))) %>%
+  ungroup() %>%
+  mutate(CROP = "Corn") %>%
+  left_join(FPR, "REGION") %>% 
+  select(STATE, REGION, FORM, PERCENTAGE, CROP) %>%
+  mutate(CLASS = "ALL CLASSES") # to match wheat
 
+#write the data
+#write.csv(Fertilizer_form_corn, "Outputs/Fertilizer_form_corn.csv",row.names = FALSE)
 ```
 
 ## Extract the figure in Cao and calculate the proportion. 
@@ -47,68 +70,49 @@ The figure is save to "Fertilizer"
 
 
 ```{r fertilizer form by Cao}
-
-# Load image
-image_path <- "Fertilizer/Fertilizer proportion_Cao/Proportion_2015.png"
-img <- image_read(image_path)
-
-# Convert image to raster data
-img_data <- as.data.frame(as.raster(img))
-
-# Get image dimensions
-img_width <- image_info(img)$width
-img_height <- image_info(img)$height
-
-# Define the number of bars (regions)
-num_bars <- 7
-bar_width <- img_width / num_bars  # Approximate width of each bar
-
-# Define region names (manually update if necessary)
-region_names <- c("NGP", "MW", "NW", "NE", "SW", "SE", "SGP")
-
-# Add REGION information based on pixel position
-img_data <- img_data %>%
-  mutate(pixel_position = rep(1:img_width, each = img_height)) %>%  # Simulate x-coordinates
-  mutate(REGION = cut(pixel_position, breaks = seq(0, img_width, length.out = num_bars + 1), labels = region_names, include.lowest = TRUE)) %>%
-  select(-pixel_position)  # Remove unnecessary column
+#
+Fertilizer_Cao <- read_excel("Fertilizer/US_N_fertilizer_type_ratio_7_regions.xlsx")
+# AnA = Anhydrous ammonia
+# UR = urea
+# AN = ammonium nitrate will be categorized to UAN
 
 
-# Define legend colors, This is from the legend png
-legend_colors <- list(
-  AnA = rgb(0, 0, 0, maxColorValue = 255),
-  AqA = rgb(255, 0, 0, maxColorValue = 255),
-  AN = rgb(0, 0, 255, maxColorValue = 255),
-  AS = rgb(255, 0, 255, maxColorValue = 255),
-  NS = rgb(0, 132, 0, maxColorValue = 255),
-  SN = rgb(0, 0, 132, maxColorValue = 255),
-  UR = rgb(132, 0, 255, maxColorValue = 255),
-  APs = rgb(132, 0, 132, maxColorValue = 255),
-  CN = rgb(132, 0, 0, maxColorValue = 255),
-  DAP = rgb(132, 132, 0, maxColorValue = 255),
-  MAP = rgb(0, 132, 132, maxColorValue = 255)
-)
+#read US's national Climate Assessment. Cao's study use this region
+NCA_ref <- read.csv("Fertilizer/National Climate Assessment.csv", header = T) %>%
+  mutate(State = toupper(State)) %>%
+  rename(STATE = State)
 
-match_colors <- function(pixel_color, legend_colors) {
-  color_distances <- sapply(legend_colors, function(color) sum(abs(col2rgb(pixel_color) - col2rgb(color))))
-  return(names(which.min(color_distances)))  # Get the closest matching color
-}
+#Wrangle the data
+Fertilizer_form <- Fertilizer_Cao %>%
+  filter(Year == 2015) %>%
+  mutate(
+    Urea = UR, #Cao used different symbols for fertilizers
+    `Urea ammonia nitrate` = AN,
+    `Anhydrous ammonia` = AnA,
+    `Other N source` = AqA + AS + NS + SN + CN + DAP + MAP + Aps
+  ) %>%
+  select(Region, Urea, `Urea ammonia nitrate`, `Anhydrous ammonia`, `Other N source`) %>%
+  rename(REGION = Region) %>%
+  pivot_longer(
+    cols = -REGION,
+    names_to = "FORM",
+    values_to = "PERCENTAGE"
+  ) %>%
+  left_join(NCA_ref, by = c("REGION" = "NCA_ID")) %>% #For the NCA and state names
+  left_join(FPR, "STATE") %>% #FPR and states.
+  select(STATE, REGION.y, FORM, PERCENTAGE) %>%
+  rename (REGION = REGION.y)
 
+#Imput fertilizer rate for names of other crops (excep corn)
+Crop_noCORN <- read.csv("Outputs/Fertilization_Rate_State_Crop.csv",header=T) %>%
+  filter(CROP != "CORN") %>%
+  select(CROP, CLASS)
 
-## Not finished. The resolution is low to distingush data, trying to reach authors for raw data (Jan 28)
+#Cross join to expand the data
+Fertilizer_form_other <- Fertilizer_form %>%
+  crossing(Crop_noCORN)
 
-# Process image data and classify pixels
-# color_counts <- img_data %>%
-#   rename(pixel_color = value) %>%
-#   group_by(pixel_color) %>%
-#   summarise(count = n(), .groups = 'drop') %>%
-#   mutate(fertilizer_type = sapply(pixel_color, match_colors, legend_colors)) %>%
-#   group_by(fertilizer_type) %>%
-#   summarise(proportion = sum(count) / sum(color_counts$count) * 100, .groups = 'drop')  # Convert to percentage
-
-# Display table
-#print(color_counts)
-
-
-
-
+#save and write csv file
+Fertilizer_form <- rbind(Fertilizer_form_corn, Fertilizer_form_other)
+write.csv(Fertilizer_form, "Outputs/3.2_Fertilizer_form.csv", row.names = FALSE)
 ```
