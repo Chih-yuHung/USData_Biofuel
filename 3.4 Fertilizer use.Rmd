@@ -1,0 +1,56 @@
+---
+title: "3.4 Fertilizer use"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-06"
+output: html_document
+---
+
+## Total N Fertilizer use, crop specific, and county level
+
+This will use the reuslt of 3.1 Fertilization rate and 3.3 Crop area to estimate N fertilizer usage
+
+
+```{r read the data}
+library(tidyverse)
+
+Area_County_Crop <- read.csv("Outputs/3.3_Area_County_Crop.csv")
+Fertilization_Rate_State_Crop <- read.csv("Outputs/3.1_Fertilization_Rate_State_Crop.csv")
+Fertilization_Rate_US_NoCrop <-read.csv("Outputs/3.1_Fertilization_Rate_US_NoCrop.csv")
+
+```
+
+
+## Join the data
+
+The fertilization rate (kg/ha) is State and crop specific, we need to join them with the area data (ha) and calculate the fertilizer usage (kg)
+
+```{r join data}
+
+Fertilizer_County_Crop <- Area_County_Crop %>%
+  left_join(
+    Fertilization_Rate_State_Crop %>% select(CROP, CLASS, STATE, `RATE_kg_ha`),
+            by= c("STATE","CROP","CLASS") 
+            ) %>%
+  left_join(
+    Fertilization_Rate_US_NoCrop %>%
+    rename(RATE_kg_ha_2 = RATE_kg_ha),  # rename here
+    by = "CROP"
+  ) %>%
+  # Use coalesce to fill missing values in RATE_kg_ha with RATE_kg_ha_2
+  mutate(RATE_kg_ha = coalesce(RATE_kg_ha, RATE_kg_ha_2)) %>%
+  # Drop the temporary column
+  select(-RATE_kg_ha_2) %>% 
+  mutate(`FERT_kg` = AREA * RATE_kg_ha) %>% #Calculate the total fertilizer used
+  filter(AREA != 0)
+
+#To check which CROP with NA (no fertilization rate), done, filled the data gap with 3.1_Fertilization_Rate_US_NoCrop
+# missing_rate_crops <- Fertilizer_County_Crop %>%
+#   filter(is.na(RATE_kg_ha)) %>%  # Filter rows where RATE.kg.ha is NA
+#   distinct(CROP) %>%  # Keep unique crop names
+#   arrange(CROP)  
+
+write.csv(Fertilizer_County_Crop, "Outputs/3.4_Fertilizer_Use_County_Crop.csv", row.names = FALSE)
+```
+
+
+

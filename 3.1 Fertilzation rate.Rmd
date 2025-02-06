@@ -326,14 +326,14 @@ Crop_Fert_Prod_FPR<- Crop_Fert_Prod_FPR %>%
   ) %>%
   ungroup() %>%
   select(-weighted_avg_RATE) %>% # Remove the temporary column
-  mutate(`RATE(kg/ha)` = round(RATE*1.12085,2)) #convert to kg/ ha
+  mutate(RATE_kg_ha = round(RATE*1.12085,2)) #convert to kg/ ha
 
 
 
 
 
 #write the results
-#write.csv(Crop_Fert_Prod_FPR, "Outputs/Fertilization_Rate_State_Crop.csv",row.names = FALSE)
-
+#write.csv(Crop_Fert_Prod_FPR, "Outputs/3.1_Fertilization_Rate_State_Crop.csv",row.names = FALSE)
+#There is a file 3.1_Fertilization_Rate_US_NoCrop.csv, which has no reference. the rate is an National estimate. 
 ```
 

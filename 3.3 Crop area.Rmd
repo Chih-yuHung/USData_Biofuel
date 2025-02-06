@@ -12,7 +12,7 @@ library(tidyverse)
 ## Crop area
 
 The crop area data is from Cropland Data Layer (https://croplandcros.scinet.usda.gov/). 
-Thanks to Daniel Aydalla extract the crop area by appling county data. The raster data provided 30 x 30 m pixel and we converted it to ha. 
+Thanks to Daniel Aydalla (PIRD, AFOLU) extract the crop area by applying county data. The raster data provided 30 x 30 m pixel and we converted it to ha. 
 
 ```{r crop area}
 Crop_area <- read.csv("Crop/USAcrops_2018_2022_perCounty_Merge.csv")
@@ -21,10 +21,12 @@ Crop_area <- read.csv("Crop/USAcrops_2018_2022_perCounty_Merge.csv")
 Crop_area <- Crop_area %>%
      separate(County_State, into = c("County", "State"), sep = " - ") %>% #Seperate state and county to two columns.
      #mutate(Year_Group = "2018_2022") %>%
-     select(-Background) #%>% #Background is the sea or the Great Lakes
+     select(-Background) %>% #Background is the sea or the Great Lakes
+     mutate(State = toupper(State))
      #group_by(County,State,Year_Group) %>%
      #summarize(across(where(is.numeric), mean, na.rm = TRUE)) %>%  # Compute mean for all numeric columns
      #ungroup()  # Remove grouping
+  
 
 
 #non agriculture land
@@ -87,35 +89,89 @@ Agr_area <- Crop_area %>%
 
 ```
 
+## Deal with the double crop area. 
+
+The double crop area should be duplicated. 
+
+```{r Double crop area}
+
+# Extract column names that start with "Dbl_Crop_"
+Dbl_crop_columns <- grep("^Dbl_Crop_", colnames(Agr_area), value = TRUE)
 
 
+# Extract unique crops, ensuring full wheat names are preserved
+unique_crops <- Dbl_crop_columns %>%
+  gsub("^Dbl_Crop_", "", .) %>%  # Remove "Dbl_Crop_" prefix
+  strsplit("_") %>%  # Split into crop pairs
+  unlist() %>%  # Flatten the list
+  unique()  # Keep unique crop names
 
-```{r Dbl crop check out}
-# Define the function
-list_high_dbl_crops <- function(data) {
-  # Define the columns to check
-  target_dbl_crops <- c(
-    "Dbl_Crop_WinWht_Soybeans",
-    "Dbl_Crop_WinWht_Corn",
-    "Dbl_Crop_WinWht_Sorghum",
-    "Dbl_Crop_Triticale_Corn"
-  )
-  
-  # Filter rows where any of these columns have a value > 50
-  filtered_data <- data %>%
-    filter(if_any(all_of(target_dbl_crops), ~ . > 1000)) %>%
-    select(State, County, all_of(target_dbl_crops)) %>%
-    distinct() # Remove duplicate entries
 
-  return(filtered_data)
+# Initialize new crop columns with zeros
+for (crop in unique_crops) {
+  Agr_area[[paste0("Dbl_", crop)]] <- 0  # Initialize with 0 for summation
 }
 
-# Apply the function to Agr_area
-high_dbl_crop_locations <- list_high_dbl_crops(Agr_area)
 
-# View the result
-print(high_dbl_crop_locations)
+# Loop through each Dbl_Crop_ column and correctly sum values across crops
+for (dbl_col in Dbl_crop_columns) {
+  # Extract the two crops from the column name
+  crops <- gsub("^Dbl_Crop_", "", dbl_col) %>% 
+    strsplit("_") %>%
+    unlist()
+  
+  # Sum the values into their respective new columns
+  for (crop in crops) {
+    Agr_area[[paste0("Dbl_", crop)]] <- Agr_area[[paste0("Dbl_", crop)]] + Agr_area[[dbl_col]]
+  }
+}
 
-sum(high_dbl_crop_locations[,3:6])
+
+# Remove the orginal columns for double crops
+Agr_area <- Agr_area %>%
+ rename(Dbl_Winter_Wheat = Dbl_WinWht, Dbl_Durum_Wheat = Dbl_Durum) %>%
+ select(-starts_with("Dbl_Crop_"), -Dbl_Wht, -Total_Dbl_area, -Dbl_percentage, - Total_Ag_area)
+ 
+
+#Pivot to long table
+Agr_area_long <- Agr_area %>%
+  pivot_longer(
+    cols = -c(State, County, Year),
+    names_to = "CROP",
+    values_to = "AREA"
+  ) %>%
+  mutate(CROP = toupper(CROP))
 
 ```
+
+### I add a variable to classify if the area is for double crop and add CLASS to match CENSUS format.
+
+NOTE: Crop area in the DISTRICT of COLUMBIA is removed. 
+
+```{r Dbl crop area variable and CENSUS format}
+
+# Pivot the data so that crop names become a single column and values remain under "Value"
+Agr_area_final <- Agr_area_long %>%
+  # Add the "DOUBLE" column: "Y" if Crop contains "DBL_", otherwise "N"
+  mutate(DOUBLE = ifelse(grepl("^DBL_", CROP), "Y", "N")) %>%
+  # Remove "Dbl_" prefix from Crop names
+  mutate(CROP = gsub("^DBL_", "", CROP)) %>%
+  # Add CLASS column based on rules
+  mutate(CLASS = case_when(
+    CROP == "PEAS" ~ "GREEN",
+    CROP == "DURUM_WHEAT" ~ "SPRING, DURUM",
+    CROP == "SPRING_WHEAT" ~ "SPRING, (EXCL DURUM)",
+    CROP == "WINTER_WHEAT" ~ "WINTER",
+    TRUE ~ "ALL CLASSES"  # Default to NA for other crops
+  )) %>%
+  mutate(CROP = gsub("DURUM_|SPRING_|WINTER_","",CROP)) %>% #remove the prefixes
+  rename(STATE= State, COOUNTY = County, YEAR = Year) %>%
+  filter(STATE != "DISTRICT OF COLUMBIA")
+
+
+
+  
+#write.csv(Agr_area_final, "Outputs/3.3_Area_County_Crop.csv", row.names = FALSE)
+
+```
+
