@@ -32,30 +32,37 @@ Crop_area <- Crop_area %>%
 #non agriculture land
 # Non_agr <- c("Pasture_Grass",	"Forest",	"Shrubland",	"Barren", "Christmas_Trees",
 #              "Other_Tree_Crops", "Clouds_No_Data",	"Developed",	"Water",	"Wetlands",
-#              "Nonag_Undefined",	"Aquaculture",	"Open_Water",	"Perennial_Ice_Snow",
+#              "Nonag_Undefined",	"Open_Water",	"Perennial_Ice_Snow",
 #              "Developed_Open_Space",	"Developed_Low_Intensity",	"Developed_Med_Intensity",
-#              "Developed_High_Intensity",	"Barren_1",	"Deciduous_Forest",	"Evergreen_Forest",	
+#              "Developed_High_Intensity",	"Barren_1",	"Deciduous_Forest",	"Evergreen_Forest",
 #              "Mixed_Forest",	"Shrubland_1",	"Grassland_Pasture",	"Woody_Wetlands",
 #              "Herbaceous_Wetlands")
-#vegetable
-Vegetables <- c(
-  "Sweet_Corn", "Onions", "Cucumbers", "Tomatoes", "Carrots", "Asparagus", "Garlic",
-  "Broccoli", "Peppers", "Lettuce", "Pumpkins", "Cauliflower", "Celery", "Radishes",
-  "Turnips", "Eggplants", "Gourds", "Cabbage", "Squash", "Pop_or_Orn_Corn"
+
+Other_agr <- c("Tobacco","Other_Crops", "Sod_Grass_Seed", "Alfalfa","Other_Hay_Non_Alfalfa","Switchgrass",
+               "Fallow_Idle_Cropland",	"Aquaculture")
+
+Vegetables <- c( 
+  "Chick_Peas", "Lentils", "Dry_Beans", "Clover_Wildflowers",
+  "Sweet_Corn", "Onions", "Cucumbers", "Tomatoes", "Carrots", "Asparagus", "Garlic", "Vetch",
+  "Broccoli", "Peppers", "Lettuce", "Pumpkins", "Cauliflower", "Celery", "Radishes", "Cotton",
+  "Turnips", "Eggplants", "Gourds", "Cabbage", "Squash", "Pop_or_Orn_Corn","Olives", "Greens",
+  "Herbs", "Mint", "Hops","Sugarbeets"
 )
 
 Fruits <- c(
+  "Misc_Vegs___Fruits", "Oranges","Pears",
   "Watermelons", "Caneberries", "Cherries", "Peaches", "Apples", "Grapes", "Citrus",
   "Pomegranates", "Nectarines", "Plums", "Strawberries", "Apricots", "Blueberries",
-  "Cranberries", "Honeydew_Melons", "Cantaloupes", "Prunes", "Avocados"
+  "Cranberries", "Honeydew_Melons", "Cantaloupes", "Prunes", "Avocados","Sugarcane"
 )
 
 Grains_exclude <- c(
-  "Rice", "Other_Small_Grains", "Oats", "Millet", "Speltz", "Buckwheat"
+  "Rice", "Other_Small_Grains", "Oats", "Millet", "Speltz", "Buckwheat", "Potatoes", "Sweet_Potatoes"
 )
 
 Oilseeds_exclude <- c(
-  "Sunflower", "Flaxseed", "Safflower", "Rape_Seed", "Mustard"
+  "Sunflower", "Flaxseed", "Safflower", "Rape_Seed", "Mustard","Pistachios","Peanuts","Pecans","Almonds",
+  "Walnuts"
 )
 
 Target_crop <- c("Barley", "Camelina", "Canola", "Corn", "Peas", "Rye", "Sorghum", "Soybeans", "Triticale",
@@ -73,18 +80,20 @@ Agr_area <- Crop_area %>%
                Fruits = rowSums(select(., all_of(Fruits)), na.rm = TRUE),
                Vegetables = rowSums(select(., all_of(Vegetables)), na.rm = TRUE),
                Grains_exclude = rowSums(select(., all_of(Grains_exclude)), na.rm = TRUE),
-               Oilseeds_exclude = rowSums(select(., all_of(Oilseeds_exclude)), na.rm = TRUE)) %>%
+               Oilseeds_exclude = rowSums(select(., all_of(Oilseeds_exclude)), na.rm = TRUE),
+               Other_agr = rowSums(select(., all_of(Other_agr)), na.rm = TRUE)) %>%
                select(
-               State, County, Year, all_of(Target_crop), Fruits, Vegetables, Grains_exclude,Oilseeds_exclude,
+               State, County, Year, all_of(Target_crop), Fruits, Vegetables, 
+               Grains_exclude,Oilseeds_exclude, Other_agr,
                all_of(Dbl_crop),all_of(Dbl_crop_exclude)) %>%
                mutate(
                Total_Dbl_area = rowSums(select(.,all_of(Dbl_crop)), na.rm = TRUE),    
                Total_Ag_area =  rowSums(select(.,where(is.numeric)), na.rm = TRUE),
                Dbl_percentage = round(Total_Dbl_area/Total_Ag_area *100,1))  
 
-
+#Below may be outdated Feb 11,2025
 #Consider the area of Dbl crops, I will deal with major Dbl crop only (they have 92.3% of Dbl crops)
-#This include "Winter wht+soybean"(75%) , "Winter wht +corn"(7.2%)  "Winter wht + Sorghum"(6.8%),  "Triticale +corn"(3.1%) 
+#This include "Winter wht+soybean"(75%) , "Winter wht +corn"(7.2%)  "Winter wht + Sorghum"(6.8%),  "Triticale +corn"(3.1%) Jan. 31. 
           
 
 ```
@@ -165,7 +174,7 @@ Agr_area_final <- Agr_area_long %>%
     TRUE ~ "ALL CLASSES"  # Default to NA for other crops
   )) %>%
   mutate(CROP = gsub("DURUM_|SPRING_|WINTER_","",CROP)) %>% #remove the prefixes
-  rename(STATE= State, COOUNTY = County, YEAR = Year) %>%
+  rename(STATE= State, COUNTY = County, YEAR = Year) %>%
   filter(STATE != "DISTRICT OF COLUMBIA")
 
 

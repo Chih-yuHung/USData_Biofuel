@@ -364,6 +364,7 @@ are developed by Cao et al.  Although it’s not crop sepcific and only
 estimated the proportion to 2015 (and before).</p>
 <p>Only corn has the exception. Nitrogen fertilizer types of corn is
 estimated ny Cooter et al., 2012.</p>
+<p>Thanks to Prof. Lu provided their data.</p>
 <p>Ref. Cao, P., Lu, C., &amp; Yu, Z. (2018). Historical nitrogen
 fertilizer use in agricultural ecosystems of the contiguous United
 States during 1850–2015: application rate, timing, and fertilizer types.
@@ -375,73 +376,89 @@ national-scale nitrogen assessments. Biogeosciens</p>
     sheet = &quot;Fertilizer form&quot;) 
 #The percentages don&#39;t add up to 100% becasue it has manure. NEED to convert to Synthetic N fertilizer only
 
+#Use Farm production region (FPR from 3.1 Fertilzation rate.Rmd)
+FPR &lt;- read.csv(&quot;Fertilizer/Farm Production Regions.csv&quot;) %&gt;%
+  mutate(STATE_NAME = toupper(State)) %&gt;%
+  select(STATE_NAME, Region) %&gt;%
+  rename(STATE = STATE_NAME,
+         REGION = Region)
+#Change WA to Mountain
+FPR &lt;- FPR %&gt;%
+  mutate(
+    REGION = case_when(
+      STATE == &quot;WASHINGTON&quot; ~ &quot;Mountain&quot;,
+      TRUE ~REGION
+  ))
+
+#calculate the percentage(with manure to N fertilizer only) and complete Corn table
 Fertilizer_form_corn &lt;- Fertilizer_form_corn %&gt;%
   group_by(REGION) %&gt;%
-  mutate(PERCENTAGE = round((PERCENTAGE/ sum(PERCENTAGE)) *100,2)) %&gt;%
-  ungroup()</code></pre>
+  mutate(PERCENTAGE = (PERCENTAGE/ sum(PERCENTAGE))) %&gt;%
+  ungroup() %&gt;%
+  mutate(CROP = &quot;Corn&quot;) %&gt;%
+  left_join(FPR, &quot;REGION&quot;) %&gt;% 
+  select(STATE, REGION, FORM, PERCENTAGE, CROP) %&gt;%
+  mutate(CLASS = &quot;ALL CLASSES&quot;) # to match wheat</code></pre>
+<pre><code>## Warning in left_join(., FPR, &quot;REGION&quot;): Detected an unexpected many-to-many relationship between `x` and `y`.
+## ℹ Row 1 of `x` matches multiple rows in `y`.
+## ℹ Row 6 of `y` matches multiple rows in `x`.
+## ℹ If a many-to-many relationship is expected, set `relationship =
+##   &quot;many-to-many&quot;` to silence this warning.</code></pre>
+<pre class="r"><code>#write the data
+#write.csv(Fertilizer_form_corn, &quot;Outputs/Fertilizer_form_corn.csv&quot;,row.names = FALSE)</code></pre>
 </div>
 <div id="extract-the-figure-in-cao-and-calculate-the-proportion." class="section level2">
 <h2>Extract the figure in Cao and calculate the proportion.</h2>
 <p>The figure is save to “Fertilizer”</p>
-<pre class="r"><code># Load image
-image_path &lt;- &quot;Fertilizer/Fertilizer proportion_Cao/Proportion_2015.png&quot;
-img &lt;- image_read(image_path)
-
-# Convert image to raster data
-img_data &lt;- as.data.frame(as.raster(img))
-
-# Get image dimensions
-img_width &lt;- image_info(img)$width
-img_height &lt;- image_info(img)$height
-
-# Define the number of bars (regions)
-num_bars &lt;- 7
-bar_width &lt;- img_width / num_bars  # Approximate width of each bar
-
-# Define region names (manually update if necessary)
-region_names &lt;- c(&quot;NGP&quot;, &quot;MW&quot;, &quot;NW&quot;, &quot;NE&quot;, &quot;SW&quot;, &quot;SE&quot;, &quot;SGP&quot;)
-
-# Add REGION information based on pixel position
-img_data &lt;- img_data %&gt;%
-  mutate(pixel_position = rep(1:img_width, each = img_height)) %&gt;%  # Simulate x-coordinates
-  mutate(REGION = cut(pixel_position, breaks = seq(0, img_width, length.out = num_bars + 1), labels = region_names, include.lowest = TRUE)) %&gt;%
-  select(-pixel_position)  # Remove unnecessary column
+<pre class="r"><code>#
+Fertilizer_Cao &lt;- read_excel(&quot;Fertilizer/US_N_fertilizer_type_ratio_7_regions.xlsx&quot;)
+# AnA = Anhydrous ammonia
+# UR = urea
+# AN = ammonium nitrate will be categorized to UAN
 
 
-# Define legend colors, This is from the legend png
-legend_colors &lt;- list(
-  AnA = rgb(0, 0, 0, maxColorValue = 255),
-  AqA = rgb(255, 0, 0, maxColorValue = 255),
-  AN = rgb(0, 0, 255, maxColorValue = 255),
-  AS = rgb(255, 0, 255, maxColorValue = 255),
-  NS = rgb(0, 132, 0, maxColorValue = 255),
-  SN = rgb(0, 0, 132, maxColorValue = 255),
-  UR = rgb(132, 0, 255, maxColorValue = 255),
-  APs = rgb(132, 0, 132, maxColorValue = 255),
-  CN = rgb(132, 0, 0, maxColorValue = 255),
-  DAP = rgb(132, 132, 0, maxColorValue = 255),
-  MAP = rgb(0, 132, 132, maxColorValue = 255)
-)
+#read US&#39;s national Climate Assessment. Cao&#39;s study use this region
+NCA_ref &lt;- read.csv(&quot;Fertilizer/National Climate Assessment.csv&quot;, header = T) %&gt;%
+  mutate(State = toupper(State)) %&gt;%
+  rename(STATE = State)
 
-match_colors &lt;- function(pixel_color, legend_colors) {
-  color_distances &lt;- sapply(legend_colors, function(color) sum(abs(col2rgb(pixel_color) - col2rgb(color))))
-  return(names(which.min(color_distances)))  # Get the closest matching color
-}
+#Wrangle the data
+Fertilizer_form &lt;- Fertilizer_Cao %&gt;%
+  filter(Year == 2015) %&gt;%
+  mutate(
+    Urea = UR, #Cao used different symbols for fertilizers
+    `Urea ammonia nitrate` = AN,
+    `Anhydrous ammonia` = AnA,
+    `Other N source` = AqA + AS + NS + SN + CN + DAP + MAP + Aps
+  ) %&gt;%
+  select(Region, Urea, `Urea ammonia nitrate`, `Anhydrous ammonia`, `Other N source`) %&gt;%
+  rename(REGION = Region) %&gt;%
+  pivot_longer(
+    cols = -REGION,
+    names_to = &quot;FORM&quot;,
+    values_to = &quot;PERCENTAGE&quot;
+  ) %&gt;%
+  left_join(NCA_ref, by = c(&quot;REGION&quot; = &quot;NCA_ID&quot;)) %&gt;% #For the NCA and state names
+  left_join(FPR, &quot;STATE&quot;) %&gt;% #FPR and states.
+  select(STATE, REGION.y, FORM, PERCENTAGE) %&gt;%
+  rename (REGION = REGION.y)</code></pre>
+<pre><code>## Warning in left_join(., NCA_ref, by = c(REGION = &quot;NCA_ID&quot;)): Detected an unexpected many-to-many relationship between `x` and `y`.
+## ℹ Row 1 of `x` matches multiple rows in `y`.
+## ℹ Row 11 of `y` matches multiple rows in `x`.
+## ℹ If a many-to-many relationship is expected, set `relationship =
+##   &quot;many-to-many&quot;` to silence this warning.</code></pre>
+<pre class="r"><code>#Imput fertilizer rate for names of other crops (excep corn)
+Crop_noCORN &lt;- read.csv(&quot;Outputs/Fertilization_Rate_State_Crop.csv&quot;,header=T) %&gt;%
+  filter(CROP != &quot;CORN&quot;) %&gt;%
+  select(CROP, CLASS)
 
+#Cross join to expand the data
+Fertilizer_form_other &lt;- Fertilizer_form %&gt;%
+  crossing(Crop_noCORN)
 
-## Not finished. The resolution is low to distingush data, trying to reach authors for raw data (Jan 28)
-
-# Process image data and classify pixels
-# color_counts &lt;- img_data %&gt;%
-#   rename(pixel_color = value) %&gt;%
-#   group_by(pixel_color) %&gt;%
-#   summarise(count = n(), .groups = &#39;drop&#39;) %&gt;%
-#   mutate(fertilizer_type = sapply(pixel_color, match_colors, legend_colors)) %&gt;%
-#   group_by(fertilizer_type) %&gt;%
-#   summarise(proportion = sum(count) / sum(color_counts$count) * 100, .groups = &#39;drop&#39;)  # Convert to percentage
-
-# Display table
-#print(color_counts)</code></pre>
+#save and write csv file
+Fertilizer_form &lt;- rbind(Fertilizer_form_corn, Fertilizer_form_other)
+write.csv(Fertilizer_form, &quot;Outputs/3.2_Fertilizer_form.csv&quot;, row.names = FALSE)</code></pre>
 </div>
 
 

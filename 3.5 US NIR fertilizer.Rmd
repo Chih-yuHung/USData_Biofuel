@@ -1,0 +1,80 @@
+---
+title: "3.5 US NIR N fertilization"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-10"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(data.table)
+```
+
+
+## US Inorganic fertilization
+
+This file shows how we estimate inorganic fertilization used in the US. This is primairly based on USA's 2024 NIR "Annex 3.12 Methodologies for SOC, N2O and CH4 from agricultural lands." 
+
+USA's 2024 NIR showed their national synthetic N fertilzation to cropland is 11305, 11249, and 11209 kt N in 2018, 2019, and 2020. (Table A-181 in Annex 3.12)
+
+
+Ref
+Brakebill, J.W. and Gronberg, J.M., 2017, County-Level Estimates of Nitrogen and Phosphorus from Commercial Fertilizer for the Conterminous United States, 1987-2012: U.S. Geological Survey data release, https://doi.org/10.5066/F7H41PKX.
+
+```{r Fertilization County level}
+#Data from Brakebill and Gronberg 2017. (1987-2012 only) 
+#According to USA CRT 2012, Inorganic N fertilizer is 11,918,834,756 kg N (NOT t N, the unit is wrong in their CRT), it's equal to sum of farm N 2012 in Brakebill's file
+Fert_County_2012 <- read.csv("Inputs/CNTY_FERT_1987-2012.csv",header=T) %>%
+                   select(State, County, farmN2012)    
+
+#Assuming there is no change of the proportion between counties. 
+#We are going to extrapolate fertilizer use based on CRT values. 
+USCRT <- "C:/Users/HungC/OneDrive - EC-EC/2023/Fuel LCA/USA NIR/US CRT/USA-CRT-2024-V0.5-submission-started/"
+
+# Generate the pattern for file matching
+file_pattern <- "USA-CRT-2024-V0.5-(201[2-9]|202[0-2])"
+
+# List all files in the folder that match the pattern
+excel_files <- list.files(path = USCRT, pattern = paste0(file_pattern, ".*\\.xlsx$"), full.names = TRUE)
+
+# Extract year from file name using regex
+extract_year <- function(file_name) {
+  sub(".*V0.5-(\\d{4}).*", "\\1", file_name)
+}
+
+# Function to read and extract the desired value
+extract_value <- function(file_path) {
+  tryCatch({
+    # Read the specific cell from the sheet "Table3.D"
+    value <- read_excel(file_path, sheet = "Table3.D", range = "D11", col_names = FALSE, .name_repair = "minimal")
+    as.numeric(value[[1]])  # Return the numeric value
+  }, error = function(e) {
+    NA  # Return NA if an error occurs
+  })
+}
+
+# Create the table
+results <- data.frame(
+  Year = sapply(excel_files, extract_year),
+  `Inorganic N fertilizer` = sapply(excel_files, extract_value)
+)
+
+# Convert the Year column to numeric for proper sorting
+results <- results %>% arrange(as.numeric(Year))
+
+#Ratio based on 2012 fertilizer. This ratio is applying to fertilizer at county level in 2012. 
+results$Ratio <- results$Inorganic.N.fertilizer/results$Inorganic.N.fertilizer[1]
+
+#The fertilization in 2018-2022
+Fert_County_1822 <- Fert_County_2012 %>%
+  mutate(farmN2018 = farmN2012 *results$Ratio[results$Year == 2018]) %>%
+  mutate(farmN2019 = farmN2012 *results$Ratio[results$Year == 2019]) %>%
+  mutate(farmN2020 = farmN2012 *results$Ratio[results$Year == 2020]) %>%
+  mutate(farmN2021 = farmN2012 *results$Ratio[results$Year == 2021]) %>%
+  mutate(farmN2022 = farmN2012 *results$Ratio[results$Year == 2022]) 
+
+#write.csv(Fert_County_1822, "Outputs/3.5_Fertilizer_County_1822.csv", row.names = FALSE)
+```

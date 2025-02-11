@@ -1,0 +1,79 @@
+---
+title: "3.6 Fertilizer Calibration"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-11"
+output: html_document
+---
+
+## Calibrate my estimate of fertilizer with US NIR's estimate
+
+It's possible I overestimate/underestimate total fertilizer usage in a county. 
+
+Overestimate:
+1. CDL could overestimate crop area, causing overestimate fertilizer use
+2. I could overestimate fertilization rate as I used local recommendation. 
+The actual fertilzation is usally adjusted based on soil test result. 
+3. Manure and other organic fertilzer are not fully considered in this analysis
+
+Underestimate:
+1. CDL could underestimate area of crop with higher fertilizer need. 
+2. Underestimate fertilization rate is possbile as I used the average rate. 
+
+
+```{r Calibration}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(readr)
+
+# read the CSV files
+Fert_County_1822 <- read.csv("Outputs/3.5_Fertilizer_County_1822.csv")
+Fertilizer_County_Crop <- read.csv("Outputs/3.4_Fertilizer_Use_County_Crop.csv")
+state_crosswalk <- read.csv("Inputs/state_crosswalk.csv")
+
+
+
+# 1) Pivot Fert_County_1822 from wide to long and create a YEAR column
+Fert_County_1822_long <- Fert_County_1822 %>%
+  pivot_longer(
+    cols = starts_with("farmN"),
+    names_to = "farm_year",
+    values_to = "farm_val"
+  ) %>%
+  mutate(
+    # Remove the "farmN" prefix, convert to numeric
+    YEAR = as.numeric(str_remove(farm_year, "farmN"))
+  )
+
+# 2) Convert state abbreviations (in the "State" column) to full names
+Fert_County_1822_long <- Fert_County_1822_long %>%
+  left_join(state_crosswalk, by = c("State" = "abbr")) %>%
+  mutate(STATE = toupper(full)) %>%
+  select(-full)  # keep it clean, removing unneeded columns
+
+# 3) Clean the COUNTY names in the second table to match (remove " County" suffix)
+Fertilizer_County_Crop_clean <- Fertilizer_County_Crop %>%
+  mutate(COUNTY = str_remove(COUNTY, " County$"))
+
+# 4) Join both tables by STATE, County, and YEAR
+Fert_Calibration <- Fert_County_1822_long %>%
+  inner_join(
+    Fertilizer_County_Crop_clean,
+    by = c("STATE", "County" = "COUNTY", "YEAR")
+  )
+
+# Now Fert_Calibration contains the YEAR column from Fert_County_1822_long
+# plus FERT_kg (and other columns) from Fertilizer_County_Crop
+
+
+Fert_Calibration <- Fert_Calibration %>%
+  group_by(STATE, County, YEAR) %>%
+  summarize(
+    Fert_NIR = mean(farm_val, na.rm = TRUE),
+    Fert_Estimated = sum(FERT_kg, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(RATIO = Fert_Estimated/Fert_NIR)
+
+```
+

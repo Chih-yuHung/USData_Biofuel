@@ -7,7 +7,7 @@ output: html_document
 
 ## Total N Fertilizer use, crop specific, and county level
 
-This will use the reuslt of 3.1 Fertilization rate and 3.3 Crop area to estimate N fertilizer usage
+This will use the result of 3.1 Fertilization rate and 3.3 Crop area to estimate N fertilizer usage
 
 
 ```{r read the data}

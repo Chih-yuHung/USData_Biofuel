@@ -334,6 +334,6 @@ Crop_Fert_Prod_FPR<- Crop_Fert_Prod_FPR %>%
 
 #write the results
 #write.csv(Crop_Fert_Prod_FPR, "Outputs/3.1_Fertilization_Rate_State_Crop.csv",row.names = FALSE)
-#There is a file 3.1_Fertilization_Rate_US_NoCrop.csv, which has no reference. the rate is an National estimate. 
+#There is a file 3.1_Fertilization_Rate_US_NoCrop.csv, which has no reference. the rate is an National estimate. It's more like an adjustable parameter.
 ```
 
