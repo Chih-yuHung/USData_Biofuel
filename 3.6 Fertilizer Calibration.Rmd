@@ -51,14 +51,10 @@ Fert_County_1822_long <- Fert_County_1822_long %>%
   mutate(STATE = toupper(full)) %>%
   select(-full)  # keep it clean, removing unneeded columns
 
-# 3) Clean the COUNTY names in the second table to match (remove " County" suffix)
-Fertilizer_County_Crop_clean <- Fertilizer_County_Crop %>%
-  mutate(COUNTY = str_remove(COUNTY, " County$"))
-
-# 4) Join both tables by STATE, County, and YEAR
+# 3) Join both tables by STATE, County, and YEAR
 Fert_Calibration <- Fert_County_1822_long %>%
   inner_join(
-    Fertilizer_County_Crop_clean,
+    Fertilizer_County_Crop,
     by = c("STATE", "County" = "COUNTY", "YEAR")
   )
 
@@ -67,7 +63,8 @@ Fert_Calibration <- Fert_County_1822_long %>%
 
 
 Fert_Calibration <- Fert_Calibration %>%
-  group_by(STATE, County, YEAR) %>%
+  rename(COUNTY = County) %>%
+  group_by(STATE, COUNTY, YEAR) %>%
   summarize(
     Fert_NIR = mean(farm_val, na.rm = TRUE),
     Fert_Estimated = sum(FERT_kg, na.rm = TRUE),
@@ -75,5 +72,82 @@ Fert_Calibration <- Fert_Calibration %>%
   ) %>%
   mutate(RATIO = Fert_Estimated/Fert_NIR)
 
+
+#write.csv(Fert_Calibration,"Outputs/3.6_Fertilizer_Calibration.csv",row.names = FALSE)
 ```
 
+
+
+## Check the crop and state over/underestimated 
+This part is not important as we're going to provide implied emission factor. The overestimated or underestimated fertilizer use will not influence the results. 
+
+```{r Estimate check}
+library(dplyr)
+library(stringr)
+
+library(dplyr)
+
+# fert_calib: Must have columns STATE, County, YEAR, RATIO
+# fert_detail: Must have columns STATE, COUNTY, YEAR, CROP, etc.
+over_under_crops <- function(fert_calib, fert_detail, threshold = 1) {
+  # 1) Subset over & under
+  over  <- fert_calib %>% filter(RATIO > threshold)
+  under <- fert_calib %>% filter(RATIO < threshold)
+
+  # 2) Join each subset with the crop-level data
+  over_with_crops <- over %>%
+    left_join(fert_detail, by = c("STATE", "County" = "COUNTY", "YEAR"))
+
+  under_with_crops <- under %>%
+    left_join(fert_detail, by = c("STATE", "County" = "COUNTY", "YEAR"))
+
+  # 3) Return as a list
+  list(
+    over  = over_with_crops,
+    under = under_with_crops
+  )
+}
+
+# Example usage:
+results <- over_under_crops(
+  fert_calib  = Fert_Calibration,            # your RATIO table
+  fert_detail = Fertilizer_County_Crop_clean # your crop-level data
+)
+
+# Inspect overestimated counties/crops
+head(results$over)
+
+# Inspect underestimated counties/crops
+head(results$under)
+
+
+
+
+# 1) Summarize overestimated rows (RATIO > 1) by STATE and CROP
+over_by_state_crop <- results$over %>%
+  group_by(STATE, CROP) %>%
+  summarize(
+    total_FERT_kg       = sum(FERT_kg, na.rm = TRUE),
+    total_Fert_Estimated= sum(Fert_Estimated, na.rm = TRUE),
+    avg_Ratio           = mean(RATIO, na.rm = TRUE), 
+    .groups = "drop"
+  ) %>%
+  arrange(STATE, CROP)
+
+# 2) Summarize underestimated rows (RATIO < 1) by STATE and CROP
+under_by_state_crop <- results$under %>%
+  group_by(STATE, CROP) %>%
+  summarize(
+    total_FERT_kg       = sum(FERT_kg, na.rm = TRUE),
+    total_Fert_Estimated= sum(Fert_Estimated, na.rm = TRUE),
+    avg_Ratio           = mean(RATIO, na.rm = TRUE), 
+    .groups = "drop"
+  ) %>%
+  arrange(STATE, CROP)
+
+# Review the results
+head(over_by_state_crop)
+head(under_by_state_crop)
+
+
+```
