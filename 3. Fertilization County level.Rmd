@@ -14,25 +14,19 @@ library(data.table)
 
 ## Fertilization County level and crop specific
 
-I will incorporate my estimate of total fertilizer use (crop specific and county level) and calibrate it with US NIR county level estimate. The proportion of fertilizer type will be applied for volatilization estimate. 
-
+I will incorporate my estimate of total fertilizer use (crop specific and county level) and calibrate it with US NIR county level estimate. The proportion of fertilizer type will be applied for volatilization estimate.
 
 ```{r Data incorporation}
 Fertilizer_County_Crop <- read.csv("Outputs/3.4_Fertilizer_use_County_Crop.csv")
 Fert_Form <- read.csv("Outputs/3.2_Fertilizer_form.csv")
 Fert_Calibration <- read.csv("Outputs/3.6_Fertilizer_Calibration.csv") %>%
-                    na.omit(.) # Some rows with NA as there is no value in CNTY_FERT_1987-2012
+na.omit(.) # Some rows with NA as there is no value in CNTY_FERT_1987-2012
 
-#Adjust the fertilizer use for crops
+
+#Adjust the fertilizer use for crops 
 Fert_County_Crop <- Fertilizer_County_Crop %>%
-  left_join(Fert_Calibration, by = c("STATE", "COUNTY", "YEAR")) %>%
-  mutate(Fert_LCA_kg = FERT_kg/RATIO) %>%
-  select(STATE,COUNTY,YEAR,CROP, CLASS, DOUBLE,Fert_LCA_kg, AREA)
-
-#Expand the data with fertilizer form
-
+left_join(Fert_Calibration, by = c("STATE", "COUNTY", "YEAR")) %>%
+mutate(Fert_LCA_kg = FERT_kg/RATIO) %>%
+select(STATE,COUNTY,YEAR,CROP, CLASS, DOUBLE,Fert_LCA_kg, AREA)
 
 ```
-
-
-

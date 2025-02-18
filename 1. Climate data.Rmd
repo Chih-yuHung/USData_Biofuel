@@ -17,12 +17,12 @@ The spatial scale is county and state.
 Original data: monthly data from 1981-2010. 
 
 ```{r read data}
-Temp <- fread("Climate Normals/Temperature_perCounty.csv", header = TRUE)
-Pre <- fread("Climate Normals/Precipitation_perCounty.csv", header = TRUE)
+# Temp <- fread("Climate Normals/Temperature_perCounty.csv", header = TRUE)
+# Pre <- fread("Climate Normals/Precipitation_perCounty.csv", header = TRUE)
 Pet <- fread("Climate Normals/PET_perCounty.csv", header = TRUE)
 
 #Name list for missing cities
-unique_Pet <- setdiff(Pet$County_State, Temp$County_State)
+# unique_Pet <- setdiff(Pet$County_State, Temp$County_State)
 
 ```
 
@@ -40,22 +40,27 @@ Manassas Parck is in Fairfax county, using the same climate
 
 
 ```{r assign climate to the four independent cities}
+### No need to do it again. 
 #Temp
-FFcounty_T <- Temp[Temp$County_State=="Fairfax County - Virginia",]
-Rbcounty_T <- Temp[Temp$County_State=="Rockbridge County - Virginia",]
-Temp <- rbind(Temp,FFcounty_T, FFcounty_T, Rbcounty_T, FFcounty_T)
-
-#rename the cities
-n <- length(Temp$County_State)
-Temp$County_State[(n-3):n] <- unique_Pet
-
-##Precipitation
-FFcounty_P <- Pre[Pre$County_State=="Fairfax County - Virginia",]
-Rbcounty_P <- Pre[Pre$County_State=="Rockbridge County - Virginia",]
-Pre <- rbind(Pre,FFcounty_P, FFcounty_P, Rbcounty_P, FFcounty_P)
-
-#rename the cities
-Pre$County_State[(n-3):n] <- unique_Pet
+# FFcounty_T <- Temp[Temp$County_State=="Fairfax County - Virginia",]
+# Rbcounty_T <- Temp[Temp$County_State=="Rockbridge County - Virginia",]
+# Temp <- rbind(Temp,FFcounty_T, FFcounty_T, Rbcounty_T, FFcounty_T)
+# 
+# #rename the cities
+# n <- length(Temp$County_State)
+# Temp$County_State[(n-3):n] <- unique_Pet
+# 
+# ##Precipitation
+# FFcounty_P <- Pre[Pre$County_State=="Fairfax County - Virginia",]
+# Rbcounty_P <- Pre[Pre$County_State=="Rockbridge County - Virginia",]
+# Pre <- rbind(Pre,FFcounty_P, FFcounty_P, Rbcounty_P, FFcounty_P)
+# 
+# #rename the cities
+# Pre$County_State[(n-3):n] <- unique_Pet
+# 
+# 
+# write.csv(Temp, "Climate Normals/Temperature_perCounty_corrected.csv", row.names = FALSE)
+# write.csv(Pre, "Climate Normals/Precipitation_perCounty_corrected.csv", row.names = FALSE)
 
 ```
 
@@ -66,6 +71,7 @@ Data need to be "State", "County", "MAT"
 The "MAT" is the average annual temperature during 1981-2010 
 
 ```{r Temperature}
+Temp <- fread("Climate Normals/Temperature_perCounty_corrected.csv", header = TRUE)
 Temp <- Temp %>%
    separate(County_State, into = c("County", "State"), sep = " - ")
 
@@ -76,16 +82,32 @@ US_Temp <- Temp %>%
             MAT = rowMeans(.[,3:362],na.rm=TRUE))
 
 
-#Growing season 
-# column_names <- colnames(Temp) 
-# Growing_season <- column_names[grepl(".*(198[1-9]|199[0-9]|200[0-9]|2010).*(05|06|07|08|09|10)$", column_names)]
-# 
-# #Table with growing seasons
-# numeric_columns <- Temp %>% 
-#   select(all_of(Growing_season))
-# 
-# # Calculate the average of the numeric columns
-# US_Temp$Temp_grow <- rowMeans(numeric_columns, na.rm = TRUE)
+# Monthly average for 1981-2010
+Temp_long <- Temp %>%
+  # Reshape so that all P_YYYYMM columns go under "name" and their values under "value"
+  pivot_longer(
+    cols = starts_with("T_"),     # or use everything() except County/State if needed
+    names_to = "name",
+    values_to = "val"
+  ) %>%
+  # Extract year and month from the last 6 digits of column name (e.g., P_198101)
+  mutate(
+    year  = as.integer(str_sub(name, -6, -3)),   # "1981"
+    month = as.integer(str_sub(name, -2, -1))    # "01"
+  ) %>%
+  # Keep only 1981–2010 data
+  filter(year >= 1981 & year <= 2010) %>%
+  # Group by County, State, and month (or remove County/State if averaging across all)
+  group_by(County, State, month) %>%
+  # Compute the mean value (removing NAs)
+  summarise(
+    mean_val = mean(val, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+
+write.csv(Temp_long,"Climate Normals/Monthly_Temp_perCounty_19812010.csv",row.names = FALSE)
+
 
 ```
 
@@ -96,6 +118,7 @@ Data need to be "State", "County", "MAP"
 The "Pre" is the total annual Precipitation during 1981-2010 
 
 ```{r Precipitation}
+Pre <- fread("Climate Normals/Precipitation_perCounty_corrected.csv", header = TRUE)
 Pre <- Pre %>%
    separate(County_State, into = c("County", "State"), sep = " - ")
 
@@ -106,17 +129,30 @@ US_Pre <- Pre %>%
           MAP = rowSums(.[,3:362])/30)
 
 
-# #Growing season 
-# column_names <- colnames(Pre) 
-# Growing_season <- column_names[grepl(".*(198[1-9]|199[0-9]|200[0-9]|2010).*(05|06|07|08|09|10)$", column_names)]
-# 
-# #Table with growing seasons
-# numeric_columns <- Pre %>% 
-#   select(all_of(Growing_season))
-# 
-# # Calculate the average of the numeric columns
-# US_Pre$Pre_grow <- rowSums(numeric_columns, na.rm = TRUE)/30
+# Monthly average for 1981-2010
+Pre_long <- Pre %>%
+  # Reshape so that all P_YYYYMM columns go under "name" and their values under "value"
+  pivot_longer(
+    cols = starts_with("P_"),     # or use everything() except County/State if needed
+    names_to = "name",
+    values_to = "val"
+  ) %>%
+  # Extract year and month from the last 6 digits of column name (e.g., P_198101)
+  mutate(
+    year  = as.integer(str_sub(name, -6, -3)),   # "1981"
+    month = as.integer(str_sub(name, -2, -1))    # "01"
+  ) %>%
+  # Keep only 1981–2010 data
+  filter(year >= 1981 & year <= 2010) %>%
+  # Group by County, State, and month (or remove County/State if averaging across all)
+  group_by(County, State, month) %>%
+  # Compute the mean value (removing NAs)
+  summarise(
+    mean_val = mean(val, na.rm = TRUE),
+    .groups  = "drop"
+  )
 
+write.csv(Pre_long,"Climate Normals/Monthly_Pre_perCounty_19812010.csv",row.names = FALSE)
 ```
 
 
@@ -132,7 +168,7 @@ Pet <- Pet %>%
 # Define the number of days in each month for a non-leap year
 days_in_month <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 
-# Assuming your data frame is named 'df' and columns 3 to 362 contain the monthly values
+# Assuming data frame is named 'df' and columns 3 to 362 contain the monthly values
 # Convert the relevant columns to a matrix
 monthly_values <- as.matrix(Pet[, 3:362])
 
@@ -152,15 +188,30 @@ US_Pet <- Pet %>%
           MPE = rowSums(.[,3:362])/30)
 
 
-# #Growing season 
-# column_names <- colnames(Pre) 
-# Growing_season <- column_names[grepl(".*(198[1-9]|199[0-9]|200[0-9]|2010).*(05|06|07|08|09|10)$", column_names)]
-# 
-# #Table with growing seasons
-# numeric_columns <- Pre %>% 
-#   select(all_of(Growing_season))
-# 
-# # Calculate the average of the numeric columns
-# US_Pre$Pre_grow <- rowSums(numeric_columns, na.rm = TRUE)/30
+#Monthly average for PET in 1981-2010
+Pet_long <- Pet %>%
+  # Reshape so that all P_YYYYMM columns go under "name" and their values under "value"
+  pivot_longer(
+    cols = starts_with("PET_"),     # or use everything() except County/State if needed
+    names_to = "name",
+    values_to = "val"
+  ) %>%
+  # Extract year and month from the last 6 digits of column name (e.g., P_198101)
+  mutate(
+    year  = as.integer(str_sub(name, -6, -3)),   # "1981"
+    month = as.integer(str_sub(name, -2, -1))    # "01"
+  ) %>%
+  # Keep only 1981–2010 data
+  filter(year >= 1981 & year <= 2010) %>%
+  # Group by County, State, and month (or remove County/State if averaging across all)
+  group_by(County, State, month) %>%
+  # Compute the mean value (removing NAs)
+  summarise(
+    mean_val = mean(val, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+
+write.csv(Pet_long,"Climate Normals/Monthly_Pet_perCounty_19812010.csv",row.names = FALSE)
 
 ```
