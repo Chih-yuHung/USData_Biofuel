@@ -184,3 +184,20 @@ Agr_area_final <- Agr_area_long %>%
 
 ```
 
+
+### Aggregated data for State only
+
+This is for Antoine's work
+
+```{r State aggregated area data}
+Agr_area_state <- Agr_area_final %>%
+  group_by(STATE, YEAR, CROP, CLASS, DOUBLE) %>%
+  summarise(State_area = sum (AREA, na.rm = TRUE)) %>%
+  group_by(STATE, CROP, CLASS, DOUBLE) %>%
+  summarise(Avg_State_area = mean(State_area, na.rm = TRUE)) %>%
+  ungroup()
+
+  
+#write.csv("Outputs/3.3_Area_State_Crop.csv", row.names = FALSE)
+
+```

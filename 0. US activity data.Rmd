@@ -6,28 +6,43 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
-## US activity data from NIR 2024 
+## US activity data 
 
-In this RMD file, I'm describing how US collect their activity data related to SOC change and N2O emissions. I need this data (less than their requirements) 
-1. land base and history data
-2. crop-specific mineral nitrogen fertilizer rate and timing
-3. tillage practices
-4. weahter data (in other RMD files, "Climate Normals" and "Weather data preparation" )
-5. edaphic characteristics (in other RMD files)
+This file is used to prepare SiteData that will got to estimate N2O EF and SOC EF. 
 
 
-```{r cars}
-summary(cars)
+
+
+
+## Indirect N2O EF
+### Leaching EF
+ Leaching EFs only require precipitation data and fertilizer data 
+ 
+```{r Leaching EF}
+ PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")
+ Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
+ 
+
+#Prepare the P and PE for crops 
+US_leaching <- Fert_County_Crop %>%
+  left_join(PRE_PET, by = c("STATE", "COUNTY")) %>%
+  mutate(
+    P = case_when(
+      DOUBLE == "N" ~ GROW_PRE,
+      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PRE,
+      TRUE ~ GROW_PRE
+    ),
+    PE = case_when(
+      DOUBLE == "N" ~ GROW_PET,
+      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PET,
+      TRUE ~ GROW_PET
+    )
+  ) %>%
+  select(STATE, COUNTY, YEAR, CROP, CLASS, DOUBLE, Fert_LCA_kg, P, PE)
+
+write.csv(US_leaching, "Outputs/0.3_US_leaching.csv", row.names = F) 
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+ 

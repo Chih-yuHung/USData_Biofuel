@@ -101,7 +101,7 @@ Temp_long <- Temp %>%
   group_by(County, State, month) %>%
   # Compute the mean value (removing NAs)
   summarise(
-    mean_val = mean(val, na.rm = TRUE),
+    mean_Temp = mean(val, na.rm = TRUE),
     .groups  = "drop"
   )
 
@@ -148,7 +148,7 @@ Pre_long <- Pre %>%
   group_by(County, State, month) %>%
   # Compute the mean value (removing NAs)
   summarise(
-    mean_val = mean(val, na.rm = TRUE),
+    mean_Pre = mean(val, na.rm = TRUE),
     .groups  = "drop"
   )
 
@@ -207,7 +207,7 @@ Pet_long <- Pet %>%
   group_by(County, State, month) %>%
   # Compute the mean value (removing NAs)
   summarise(
-    mean_val = mean(val, na.rm = TRUE),
+    mean_Pet = mean(val, na.rm = TRUE),
     .groups  = "drop"
   )
 

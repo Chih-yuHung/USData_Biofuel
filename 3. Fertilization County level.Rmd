@@ -29,4 +29,5 @@ left_join(Fert_Calibration, by = c("STATE", "COUNTY", "YEAR")) %>%
 mutate(Fert_LCA_kg = FERT_kg/RATIO) %>%
 select(STATE,COUNTY,YEAR,CROP, CLASS, DOUBLE,Fert_LCA_kg, AREA)
 
+write.csv(Fert_County_Crop,"Outputs/3.0_Fertilizer_County_Crop_LCA.csv",row.names = FALSE)
 ```
