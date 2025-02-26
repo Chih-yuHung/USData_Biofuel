@@ -41,7 +41,7 @@ Fertilizer_County_Crop <- Area_County_Crop %>%
   # Drop the temporary column
   select(-RATE_kg_ha_2) %>% 
   mutate(`FERT_kg` = AREA * RATE_kg_ha) %>% #Calculate the total fertilizer used
-  filter(AREA != 0) %>%
+  #filter(AREA != 0) %>%
   mutate(COUNTY = str_remove(COUNTY, " County$"))
 
 
@@ -51,6 +51,29 @@ Fertilizer_County_Crop <- Area_County_Crop %>%
 #   filter(is.na(RATE_kg_ha)) %>%  # Filter rows where RATE.kg.ha is NA
 #   distinct(CROP) %>%  # Keep unique crop names
 #   arrange(CROP)  
+# 
+# 
+# #Expand the data to full crop list
+# #Extract all unique CROP and CLASS combinations
+# unique_crops <- Fertilizer_County_Crop %>%
+#   select(CROP, CLASS) %>%
+#   distinct()
+# 
+# # Step 2: Extract all unique STATE, COUNTY, YEAR
+# unique_locations <- Fertilizer_County_Crop %>%
+#   select(STATE, COUNTY, YEAR) %>%
+#   distinct()
+# 
+# # Step 3: Create all possible combinations
+# expanded_data <- expand_grid(unique_locations, unique_crops)
+# 
+# # Step 4: Left join with the original data to retain existing values
+# Fertilizer_County_Crop <- expanded_data %>%
+#   left_join(Fertilizer_County_Crop, by = c("STATE", "COUNTY", "YEAR", "CROP", "CLASS")) %>%
+#   mutate(FERT_kg = ifelse(is.na(FERT_kg), 0, FERT_kg),  # Fill missing values
+#          AREA = ifelse(is.na(AREA), 0, AREA))  # Fill missing values
+
+
 
 write.csv(Fertilizer_County_Crop, "Outputs/3.4_Fertilizer_Use_County_Crop.csv", row.names = FALSE)
 ```

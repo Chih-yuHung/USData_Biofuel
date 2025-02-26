@@ -1,0 +1,107 @@
+---
+title: "2.1 Soil texture"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-26"
+output: html_document
+---
+
+## Soil texture data from SSURGO
+
+The Soil Survey Geographic Database (SSURGO) collected by the National Cooperative Soil Survey over the course of a century. 
+(https://www.nrcs.usda.gov/resources/data-and-reports/soil-survey-geographic-database-ssurgo)
+
+They provide an R package, soilDB, to obtain data from SSURGO
+
+```{r obtain the data}
+# Load required packages
+library(soilDB)
+library(tidyverse)
+
+state_crosswalk <- read_csv("state_crosswalk.csv") # for all state's name
+
+```
+
+## Determine Soil texture class
+
+The soil texture class are coarse, medium and fine in our N2O emissions estimate. 
+
+```{r Soil texture class}
+#Classifiy based on USDA soil texture. Medium and Coarse have 0.49 ratio and Fine have 2.55 ratio
+classify_soil_texture <- function(clay, sand) {
+  if (clay >= 35) {
+    return("Fine")
+  } else if (clay >= 27.5 & sand < 45) {
+    return("Fine")
+  } else {
+    return("Med/Coarse")
+  }
+}
+```
+
+
+## Soil sand, silt, clay content from soil texture
+
+Every state has multiple mukey, which is the least survey unit in SSURGO. Each mukey has its unique sand, silt, clay content. I'm going to use this to determine their soil texture and based on their area to determine the percentage of Fine soil and Med/Coarse soil in the State. 
+
+
+```{r Loop all state for soil texture}
+# Loop through each state abbreviation in state_crosswalk
+# Initialize an empty dataframe to store results
+all_states_texture_summary <- data.frame()
+
+# Loop through each state abbreviation in state_crosswalk
+for (state_code in state_crosswalk$abbr) {
+  
+  # Fetch soil texture data (sand, silt, clay) by mukey
+  soil_texture <- get_SDA_property(
+    property = c("sandtotal_r", "silttotal_r", "claytotal_r"),
+    method = "Weighted Average",
+    WHERE = paste0("areasymbol LIKE '", state_code, "%'")
+  ) %>% select(mukey, sandtotal_r, silttotal_r, claytotal_r)
+
+  # Fetch area data using mukey from get_mapunit_from_SDA()
+  area_data <- get_mapunit_from_SDA(
+    WHERE = paste0("areasymbol LIKE '", state_code, "%'")
+  ) %>% select(mukey, muacres)
+
+  # Merge both datasets by mukey
+  soil_texture_area <- left_join(soil_texture, area_data, by = "mukey")
+
+  # Remove rows with NA values
+  soil_texture_area_clean <- soil_texture_area %>%
+    na.omit()
+
+  # Skip this iteration if no valid data is found for the state
+  if (nrow(soil_texture_area_clean) == 0) next
+
+  # Classify soil texture for each mukey
+  soil_texture_area_clean <- soil_texture_area_clean %>%
+    mutate(Soil_Texture = mapply(classify_soil_texture, claytotal_r, sandtotal_r))
+
+  # Calculate total area
+  total_area <- sum(soil_texture_area_clean$muacres, na.rm = TRUE)
+
+  # Compute percentage of each soil texture type
+  fine_area <- sum(soil_texture_area_clean$muacres[soil_texture_area_clean$Soil_Texture == "Fine"], na.rm = TRUE)
+  med_coarse_area <- sum(soil_texture_area_clean$muacres[soil_texture_area_clean$Soil_Texture == "Med/Coarse"], na.rm = TRUE)
+
+  # Calculate percentage of each soil texture category
+  fine_percentage <- (fine_area / total_area) * 100
+  med_coarse_percentage <- (med_coarse_area / total_area) * 100
+
+  # Create a summary dataframe for the state
+  state_texture_summary <- data.frame(
+    State = state_code,
+    Total_Area_Acres = total_area,
+    Fine_Percent = fine_percentage,
+    Med_Coarse_Percent = med_coarse_percentage
+  )
+
+  # Append to the final results dataframe
+  all_states_texture_summary <- bind_rows(all_states_texture_summary, state_texture_summary)
+}
+
+#write.csv(all_states_texture_summary,"Outputs/2.1_Soil texture.csv", row.names = FALSE)
+```
+
+

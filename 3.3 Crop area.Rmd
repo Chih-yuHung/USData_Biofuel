@@ -198,6 +198,6 @@ Agr_area_state <- Agr_area_final %>%
   ungroup()
 
   
-#write.csv("Outputs/3.3_Area_State_Crop.csv", row.names = FALSE)
+write.csv(Agr_area_state, "Outputs/3.3_Area_State_Crop.csv", row.names = FALSE)
 
 ```
