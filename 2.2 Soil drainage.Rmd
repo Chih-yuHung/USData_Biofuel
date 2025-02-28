@@ -1,0 +1,88 @@
+---
+title: "2.2 Soil drainage"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-26"
+output: html_document
+---
+
+## Soil drainage data from SSURGO
+
+The Soil Survey Geographic Database (SSURGO) collected by the National Cooperative Soil Survey over the course of a century. 
+(https://www.nrcs.usda.gov/resources/data-and-reports/soil-survey-geographic-database-ssurgo)
+
+They provide an R package, soilDB, to obtain data from SSURGO
+
+```{r obtain the data}
+# Load required packages
+library(soilDB)
+library(tidyverse)
+
+state_crosswalk <- read_csv("state_crosswalk.csv") # for all state's name
+
+```
+
+
+## Soil drainage data
+
+Every state has multiple mukeys, which are the least survey unit in SSURGO. 
+
+
+```{r Loop all state for soil saturation}
+# Loop through each state abbreviation in state_crosswalk
+# Initialize an empty dataframe to store results
+all_states_texture_summary <- data.frame()
+
+# Loop through each state abbreviation in state_crosswalk
+for (state_code in state_crosswalk$abbr) {
+  
+  # Query soil attributes from muaggatt
+  saturation_data <- get_SDA_muaggatt(
+  WHERE = paste0("areasymbol LIKE '", state_code, "%'")) %>%
+  select(mukey, wtdepannmin, wtdepaprjunmin, drclassdcd, hydclprs, pondfreqprs)
+  
+  
+ # Fetch area data using mukey from get_mapunit_from_SDA()
+  area_data <- get_mapunit_from_SDA(
+    WHERE = paste0("areasymbol LIKE '", state_code, "%'")
+  ) %>% select(mukey, muacres)
+
+  # Merge both datasets by mukey
+  soil_saturation_area <- left_join(saturation_data, area_data, by = "mukey")
+  
+  #Filter data to find flood prone soils, but not flooded 
+  saturation_prone_soils <- soil_saturation_area %>%
+  filter(
+    wtdepaprjunmin <= 30 ,  # Shallow water table (≤30 cm)
+    drclassdcd %in% c("Poorly drained","Somewhat poorly drained", "Very poorly drained"),  
+    # Low drainage capacity
+    #hydclprs > 10,  # Hydric soils (likely to retain water) high
+    hydclprs > 40,  # Hydric soils (likely to retain water)  low
+    #pondfreqprs <= 30  # No significant ponding (to exclude flooded soils) high
+    pondfreqprs <= 10  # No significant ponding (to exclude flooded soils) low
+  )
+
+  
+  # Calculate total area 
+  total_area <- sum(soil_saturation_area$muacres, na.rm = TRUE)
+  total_saturation_area <- sum(saturation_prone_soils$muacres, na.rm = TRUE)
+
+  # Compute percentage of each poor drainage area
+  Topo <- total_saturation_area/total_area
+
+
+  # Create a summary dataframe for the state
+  state_texture_summary <- data.frame(
+    State = state_code,
+    Total_Area_Acres = total_area,
+    Total_Saturation_Area = total_saturation_area,
+    Topo = Topo
+  )
+
+  # Append to the final results dataframe
+  all_states_texture_summary <- bind_rows(all_states_texture_summary, state_texture_summary)
+}
+
+write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo_low.csv", row.names = FALSE)
+
+```
+

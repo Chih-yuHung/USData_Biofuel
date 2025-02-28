@@ -104,4 +104,3 @@ for (state_code in state_crosswalk$abbr) {
 #write.csv(all_states_texture_summary,"Outputs/2.1_Soil texture.csv", row.names = FALSE)
 ```
 
-
