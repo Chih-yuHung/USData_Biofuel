@@ -12,6 +12,7 @@ Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
 PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")
 Topo <- read_csv("Outputs/2.2_Soil topo_low.csv")
 NGS <- read_csv("Outputs/1.3_Non-growing season_30y.csv")
+Texture <-read_csv("Outputs/2.1_Soil texture.csv")
 ```
 
 ## US activity data 
@@ -38,10 +39,11 @@ US_Direct <- Fert_County_Crop %>%
   ) %>%
   left_join(Topo, by = c("STATE" = "State")) %>%
   left_join(NGS, by = c("STATE" = "State", "COUNTY" = "County")) %>%
-  select(STATE, COUNTY, YEAR, CROP, CLASS, DOUBLE, Fert_LCA_kg, P, PE, Topo, NGS)
+  left_join(Texture, by = c("STATE" = "State")) %>%
+  select(STATE, COUNTY, YEAR, CROP, CLASS, DOUBLE, Fert_LCA_kg, P, PE, Topo, NGS, Frac_Fine, Frac_Medium, Frac_Coarse)
 
 
-write.csv(US_Direct, "Outputs/0.1_US_Direct.csv", row.names = F) 
+#write.csv(US_Direct, "Outputs/0.1_US_Direct.csv", row.names = F) 
 ```
 
 
