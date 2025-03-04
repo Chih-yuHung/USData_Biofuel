@@ -1,0 +1,53 @@
+---
+title: "1.3 Growing season"
+author: "Dr. Chih-Yu Hung"
+date: "2025-03-4"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(data.table)
+
+Temp <- read_csv("Climate Normals/Monthly_Temp_perCounty_19812010.csv")
+```
+
+
+## Determine if we are going to apply coef of non-growing season 
+
+The reason why we need to apply non-growing season coef is the spring freeze-thaw cycles (FTC). The are hot moments cause soil N2O emissions in temperate regions. The intensity of freeze also influence the magnitude of soil N2O emissions. 
+
+We will calculate Cumulative freeze degree day (CFD) to determine if we want to apply the non-growing season factor. (Wagner-Riddle et. al., 2017)
+
+The f(x) = 1.98(1−e(−0.00724x)), We use  XXX method and then determine when CFD more than 96 it has non-growing season 
+
+Ref.
+DOI: 10.1038/ngeo2907
+DOI: 10.1016/j.agee.2021.107620
+DOI: 10.1139/cjss-2022-0101
+DOI: 10.1016/j.apsoil.2020.103786
+
+
+
+```{r NGS coef}
+library(dplyr)
+
+# Create a lookup for days in each month, ignoring leap years
+days_lookup <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+NGS <- Temp %>%
+  # Attach the day count based on month
+  mutate(days = days_lookup[month]) %>%
+  # Calculate contribution only when mean_Temp < 0
+  mutate(temp_contrib = if_else(mean_Temp < 0, mean_Temp * days, 0)) %>%
+  # Sum the contributions for each County-State combination
+  group_by(County, State) %>%
+  summarise(cumulative_temp = sum(temp_contrib), .groups = "drop") %>%
+  # Create the indicator column
+  mutate(NGS = if_else(cumulative_temp < -96, "Y", "N"))
+
+
+
+write.csv(NGS,"Outputs/1.3_Non-growing season_30y.csv", row.names = FALSE)
+```
+
