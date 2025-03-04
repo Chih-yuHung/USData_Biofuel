@@ -10,6 +10,7 @@ library(tidyverse)
 library(data.table)
 
 Temp <- read_csv("Climate Normals/Monthly_Temp_perCounty_19812010.csv")
+
 ```
 
 
@@ -30,7 +31,6 @@ DOI: 10.1016/j.apsoil.2020.103786
 
 
 ```{r NGS coef}
-library(dplyr)
 
 # Create a lookup for days in each month, ignoring leap years
 days_lookup <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
@@ -45,6 +45,11 @@ NGS <- Temp %>%
   summarise(cumulative_temp = sum(temp_contrib), .groups = "drop") %>%
   # Create the indicator column
   mutate(NGS = if_else(cumulative_temp < -96, "Y", "N"))
+
+
+NGS <- NGS %>%
+  mutate(County = str_replace(County, " County$", "")) %>%
+  mutate(State = toupper(State))
 
 
 

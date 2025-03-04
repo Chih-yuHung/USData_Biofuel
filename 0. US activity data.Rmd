@@ -7,13 +7,42 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+
+Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
+PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")
+Topo <- read_csv("Outputs/2.2_Soil topo_low.csv")
+NGS <- read_csv("Outputs/1.3_Non-growing season_30y.csv")
 ```
 
 ## US activity data 
 
 This file is used to prepare SiteData that will got to estimate N2O EF and SOC EF. 
 
+## Direct N2O EF
+### Direct N2O EF from synthetic fertilizer
+```{r Direct EF }
+#Prepare the P and PE for crops 
+US_Direct <- Fert_County_Crop %>%
+  left_join(PRE_PET, by = c("STATE", "COUNTY")) %>%
+  mutate(
+    P = case_when(
+      DOUBLE == "N" ~ GROW_PRE,
+      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PRE,
+      TRUE ~ GROW_PRE
+    ),
+    PE = case_when(
+      DOUBLE == "N" ~ GROW_PET,
+      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PET,
+      TRUE ~ GROW_PET
+    )
+  ) %>%
+  left_join(Topo, by = c("STATE" = "State")) %>%
+  left_join(NGS, by = c("STATE" = "State", "COUNTY" = "County")) %>%
+  select(STATE, COUNTY, YEAR, CROP, CLASS, DOUBLE, Fert_LCA_kg, P, PE, Topo, NGS)
 
+
+write.csv(US_Direct, "Outputs/0.1_US_Direct.csv", row.names = F) 
+```
 
 
 
@@ -22,9 +51,6 @@ This file is used to prepare SiteData that will got to estimate N2O EF and SOC E
  Leaching EFs only require precipitation data and fertilizer data 
  
 ```{r Leaching EF}
- PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")
- Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
- 
 
 #Prepare the P and PE for crops 
 US_leaching <- Fert_County_Crop %>%

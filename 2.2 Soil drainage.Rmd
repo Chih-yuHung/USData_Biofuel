@@ -34,7 +34,7 @@ all_states_texture_summary <- data.frame()
 
 # Loop through each state abbreviation in state_crosswalk
 for (state_code in state_crosswalk$abbr) {
-  
+  cat(state_code)
   # Query soil attributes from muaggatt
   saturation_data <- get_SDA_muaggatt(
   WHERE = paste0("areasymbol LIKE '", state_code, "%'")) %>%
@@ -55,10 +55,10 @@ for (state_code in state_crosswalk$abbr) {
     wtdepaprjunmin <= 30 ,  # Shallow water table (≤30 cm)
     drclassdcd %in% c("Poorly drained","Somewhat poorly drained", "Very poorly drained"),  
     # Low drainage capacity
-    #hydclprs > 10,  # Hydric soils (likely to retain water) high
-    hydclprs > 40,  # Hydric soils (likely to retain water)  low
-    #pondfreqprs <= 30  # No significant ponding (to exclude flooded soils) high
-    pondfreqprs <= 10  # No significant ponding (to exclude flooded soils) low
+    hydclprs > 10,  # Hydric soils (likely to retain water) high
+    #hydclprs > 40,  # Hydric soils (likely to retain water)  low
+    pondfreqprs <= 30  # No significant ponding (to exclude flooded soils) high
+    #pondfreqprs <= 10  # No significant ponding (to exclude flooded soils) low
   )
 
   
@@ -68,8 +68,8 @@ for (state_code in state_crosswalk$abbr) {
 
   # Compute percentage of each poor drainage area
   Topo <- total_saturation_area/total_area
-
-
+  
+  cat(paste0(state_code,Topo,""))
   # Create a summary dataframe for the state
   state_texture_summary <- data.frame(
     State = state_code,
@@ -82,7 +82,14 @@ for (state_code in state_crosswalk$abbr) {
   all_states_texture_summary <- bind_rows(all_states_texture_summary, state_texture_summary)
 }
 
-write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo_low.csv", row.names = FALSE)
+all_states_texture_summary <- all_states_texture_summary %>%
+  left_join(state_crosswalk, by = c("State" = "abbr")) %>%
+  select(-State) %>%
+  rename(State = full) %>%
+  mutate(State = toupper(State))
+
+#write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo_low.csv", row.names = FALSE)
+write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo_high.csv", row.names = FALSE)
 
 ```
 
