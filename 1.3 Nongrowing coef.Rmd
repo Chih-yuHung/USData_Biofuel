@@ -6,8 +6,8 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-library(tidyverse)
-library(data.table)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("setup.R")
 
 Temp <- read_csv("Climate Normals/Monthly_Temp_perCounty_19812010.csv")
 

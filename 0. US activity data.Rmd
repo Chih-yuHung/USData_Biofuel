@@ -5,8 +5,8 @@ date: "2024-12-19"
 output: html_document
 ---
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("R/setup.R")
 
 Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
 PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")

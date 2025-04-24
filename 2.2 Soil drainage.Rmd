@@ -12,12 +12,9 @@ The Soil Survey Geographic Database (SSURGO) collected by the National Cooperati
 
 They provide an R package, soilDB, to obtain data from SSURGO
 
-```{r obtain the data}
-# Load required packages
-library(soilDB)
-library(tidyverse)
-
-state_crosswalk <- read_csv("state_crosswalk.csv") # for all state's name
+```{r setup}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("setup.R")
 
 ```
 

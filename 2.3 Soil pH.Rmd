@@ -1,0 +1,67 @@
+---
+title: "2.3 Soil pH"
+author: "Dr. Chih-Yu Hung"
+date: "2025-02-26"
+output: html_document
+---
+
+## Soil pH data from SSURGO
+
+The Soil Survey Geographic Database (SSURGO) collected by the National Cooperative Soil Survey over the course of a century. 
+(https://www.nrcs.usda.gov/resources/data-and-reports/soil-survey-geographic-database-ssurgo)
+
+They provide an R package, soilDB, to obtain data from SSURGO
+
+```{r setup}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("setup.R")
+
+```
+
+
+## Soil sand, silt, clay content from soil texture
+
+Every state has multiple mukey, which is the least survey unit in SSURGO. Each mukey has its unique sand, silt, clay content. I'm going to use this to determine their soil texture and based on their area to determine the percentage of Fine soil and Med/Coarse soil in the State. 
+
+
+```{r Loop all state for soil texture}
+# Define the state abbreviation (first two letters of areasymbol)
+state_code <- "CA"  # Change this for different states
+
+# Query soil attributes from muaggatt
+saturation_data <- get_chorizon_from_SDA(
+  WHERE = "areasymbol = 'IN001'" #paste0("areasymbol LIKE '", state_code, "%'") & 
+)
+
+%>%
+  select(mukey, ph1to1h2o)
+
+# Filter for soils that are prone to saturation but not frequently flooded
+saturation_prone_soils <- saturation_data %>%
+  filter(
+    wtdepannmin <= 50 | wtdepaprjunmin <= 50,  # Shallow water table (≤50 cm)
+    drclassdcd %in% c("Poorly Drained", "Very Poorly Drained"),  # Low drainage capacity
+    hydclprs > 0,  # Hydric soils (likely to retain water)
+    pondfreqprs == 0  # No significant ponding (to exclude flooded soils)
+  )
+
+# Display the results
+print(saturation_prone_soils)
+
+# Save to CSV if needed
+# write.csv(saturation_prone_soils, "saturation_prone_soils.csv", row.names = FALSE)
+
+
+# Save to CSV if needed
+# write.csv(saturation_prone_soils, "saturation_prone_soils.csv", row.names = FALSE)
+
+```
+
+
+```{r }
+area_data <- get_SDA_muaggatt(
+  WHERE = paste0("areasymbol LIKE '", state_code, "%'")
+)
+
+```
+

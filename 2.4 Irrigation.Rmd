@@ -1,0 +1,100 @@
+---
+title: "2.4 Irrigation"
+author: "Dr. Chih-Yu Hung"
+date: "2025-04-14"
+output: html_document
+---
+
+## Irrigation land in the US
+
+In the US NIR, "irrigation is modeled by assuming that water is applied to the level of field capacity on the day after the soil drains to 60 percent of field capacity in the DayCent model simulation. To the extend the time series to 1950, the amount of NRI survey locations with irrigation are scaled backward in time from 1979 to 1950 using historical data on irrigation management
+(Haines et al. 2018).
+
+
+The irrigation data in the US census have two parts, 1. total irrigated land in the states and 2. irrigated land for specific crops. They have COUNTY LEVEL data for irrigated land, but many data are suppressed. Use total irrigated land area at State level. 
+
+Irrigation data is from Census 2017 and 2022. Since we'd like data from 2018-2022 (the average), I'm using their average to represent irrigation fraction for each crop in each state. 
+
+
+### Operated area
+To know the total area that could have tillage operation, filters were applied
+1. PRODN_PRACTICE_DESC = "ALL PRODUCTION PRACTICES"
+2. STATISTICCAT_DEC = "AREA HARVESTED"
+3. UNIT_DESC = "ACRES"
+4. DOMAIN_DESC = "AREA OPERATED"
+5. AGG_LEVEL_DESC = "STATE"  (to get state level data)
+
+After the filter, sum of "VALUE" is the total area (acre) for the crop in the state.
+
+```{r setup}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("R/setup.R")
+```
+
+```{r obtain the data}
+#Only included the target crops
+load("Inputs/data_crop_2022.RData")
+load("Inputs/data_crop_2017.RData")
+
+#To filter the total area data in 2022 and 2017
+data_area_2022 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot))
+  
+
+data_area_2017 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot))
+
+```
+
+
+## Irrigation
+
+``` {r irrigation area}
+#To filter the irrigation data in 2022 and 2017
+data_Irri_2022 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "IRRIGATED") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC %in% c("ACRES")) %>% 
+  filter(DOMAIN_DESC == "AREA HARVESTED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot))
+
+
+data_Irri_2017 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "IRRIGATED") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC %in% c("ACRES")) %>% 
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot))
+
+#Join the data to determin irrigation fraction
+Frac_irri_2017 <- data_area_2017 %>%
+  left_join(data_Irri_2017, by = c("COMMODITY_DESC", "STATE_NAME")) %>%
+  mutate(Frac_irri = Area_tot.y/Area_tot.x)
+
+```
+
+
