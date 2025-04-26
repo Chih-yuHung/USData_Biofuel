@@ -1,11 +1,11 @@
 ---
-title: "2.3 Soil pH"
+title: "2.4 Soil CEC"
 author: "Dr. Chih-Yu Hung"
-date: "2025-02-26"
+date: "2025-04-25"
 output: html_document
 ---
 
-## Soil pH data from SSURGO
+## Soil CEC data from SSURGO
 
 The Soil Survey Geographic Database (SSURGO) collected by the National Cooperative Soil Survey over the course of a century. 
 (https://www.nrcs.usda.gov/resources/data-and-reports/soil-survey-geographic-database-ssurgo)
@@ -19,22 +19,22 @@ source("setup.R")
 ```
 
 
-## Soil pH
+## Soil CEC
 
-Every state has multiple mukey, which is the least survey unit in SSURGO. Each mukey has its unique pH (water). I'm going to use this to determine their soil pH and based on their area to determine the percentage of acidic soil in the state.
+Every state has multiple mukey, which is the least survey unit in SSURGO. Each mukey has its unique CEC content. I'm going to use this to determine their soil CEC and based on their area to determine the percentage of soil fertility for volatilization. 
 
 
 ```{r Loop all state for soil texture}
 # Initialize result table
 # Initialize result table
-ph_fraction_by_state <- data.frame()
+cec_fraction_by_state <- data.frame()
 
 # Loop through each state abbreviation
 for (state_code in state_crosswalk$abbr) {
   
-  # Get soil pH (1:1 H2O, 0–30 cm)
-  ph_data <- get_SDA_property(
-    property = "ph1to1h2o_r", 
+  # Get soil CEC (ph7, 0–30 cm)
+  cec_data <- get_SDA_property(
+    property = "cec7_r", 
     method = "Weighted Average", 
     WHERE = paste0("areasymbol LIKE '", state_code, "%'"), 
     top_depth = 0, 
@@ -47,34 +47,34 @@ for (state_code in state_crosswalk$abbr) {
   ) %>% select(mukey, muacres)
   
   # Join and classify
-  ph_data_with_area <- left_join(ph_data, area_data, by = "mukey") %>%
+  cec_data_with_area <- left_join(cec_data, area_data, by = "mukey") %>%
     na.omit() %>%
-    mutate(SoilpH = ifelse(ph1to1h2o_r < 7.25, -1, 0))
+    mutate(SoilCEC = ifelse(cec7_r < 25, -1, 0))
   
   # Summarize by pH class
-  ph_area_fraction <- ph_data_with_area %>%
-    group_by(SoilpH) %>%
+  cec_area_fraction <- cec_data_with_area %>%
+    group_by(SoilCEC) %>%
     summarise(area = sum(muacres, na.rm = TRUE), .groups = "drop") %>%
     mutate(abbr = state_code)  # keep abbreviation for now
   
   # Append to final result
-  ph_fraction_by_state <- bind_rows(ph_fraction_by_state, ph_area_fraction)
+  cec_fraction_by_state <- bind_rows(cec_fraction_by_state, cec_area_fraction)
 }
 
 
 
 # Add full state names from state_crosswalk$full
-ph_fraction_by_state <- ph_fraction_by_state %>%
+cec_fraction_by_state <- cec_fraction_by_state %>%
   left_join(state_crosswalk, by = "abbr") %>%
   group_by(full) %>%
   mutate(Fraction = area / sum(area)) %>%
   ungroup() %>%
   rename(State = full) %>% 
   mutate(State = toupper(State)) %>%
-  select(State, SoilpH, area, Fraction)
+  select(State, SoilCEC, area,Fraction)
 
 # Save to CSV if needed
-#write.csv(ph_fraction_by_state, "Outputs/2.3_Soil pH.csv", row.names = FALSE)
+#write.csv(cec_fraction_by_state, "Outputs/2.4_Soil CEC.csv", row.names = FALSE)
 
 
 ```

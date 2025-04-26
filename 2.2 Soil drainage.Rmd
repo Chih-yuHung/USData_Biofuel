@@ -31,7 +31,6 @@ all_states_texture_summary <- data.frame()
 
 # Loop through each state abbreviation in state_crosswalk
 for (state_code in state_crosswalk$abbr) {
-  cat(state_code)
   # Query soil attributes from muaggatt
   saturation_data <- get_SDA_muaggatt(
   WHERE = paste0("areasymbol LIKE '", state_code, "%'")) %>%
