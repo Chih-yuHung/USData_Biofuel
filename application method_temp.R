@@ -5,7 +5,7 @@ library(stringr)
 Fertilizer_form <- read.csv("Outputs/3.2_Fertilizer_form - Copy.csv")
 Fertilizer_use <- read.csv("Outputs/3.4_Fertilizer_Use_County_Crop - Copy.csv") %>%
   select(-AREA,-RATE_kg_ha)
-CEAP_Fertilization <- read_xlsx("Inputs/Fertilization practice_CEAP.xlsx")
+CEAP_Fertilization <- read_xlsx("Inputs/Fertilization practice_CEAP - Copy.xlsx")
 
 
 # ── 1a.  State‑level fertilizer‑form shares ────────────────────────────────
@@ -75,7 +75,7 @@ state_crop_class <- fert_share_wide %>%      # p1 … p4 = Urea,UAN,AA,Other
     cap_total = A + S,
     # ------------------------------------------------------------------
     # AA takes first from A, then from S
-    inc3 = need_AA,                                # AA gets all it needs
+    inc3 = need_AA,                  #              AA gets all it needs
     A_left = ifelse(need_AA >= A, 0, A - need_AA), # "All" left after AA
     S_drawn = pmax(need_AA - A, 0),           # what AA had to draw from “Some”
     S_left  = pmax(S - S_drawn, 0),           # remainder of “Some”
@@ -84,11 +84,30 @@ state_crop_class <- fert_share_wide %>%      # p1 … p4 = Urea,UAN,AA,Other
     addl_incorp = A_left + 0.5 * S_left,         # ½ of remaining “Some”
     n_avail     = (p1 > 0) + (p2 > 0) + (p4 > 0),   # how many (1/2/4) present
     inc_other   = addl_incorp / n_avail,           # split evenly to 1,2,4
-    #inc_other   = addl_incorp / 3,               # split evenly to 1,2,4
+    
+    inc1_init   = ifelse(p1 > 0, pmin(p1, inc_other), 0),
+    inc2_init   = ifelse(p2 > 0, pmin(p2, inc_other), 0),
+    inc4_init   = ifelse(p4 > 0, pmin(p4, inc_other), 0),
+    used_init   = inc1_init + inc2_init + inc4_init,
+    rem_incorp  = addl_incorp - used_init,         # still unused capacity
     # cap at each fertiliser’s total share
     inc1 = pmin(p1, inc_other),
     inc2 = pmin(p2, inc_other),
     inc4 = pmin(p4, inc_other),
+    
+    # remaining head‑room for each fert
+    head1   = pmax(p1 - inc1_init, 0),
+    head2   = pmax(p2 - inc2_init, 0),
+    head4   = pmax(p4 - inc4_init, 0),
+    head_sum = head1 + head2 + head4,
+    
+    # ── 2∘ pass: distribute remainder proportional to head‑room ───────
+    incr_factor = ifelse(head_sum > 0, rem_incorp / head_sum, 0),
+    
+    inc1 = inc1_init + head1 * incr_factor,
+    inc2 = inc2_init + head2 * incr_factor,
+    inc4 = inc4_init + head4 * incr_factor,
+    
     # ------------------------------------------------------------------
     broadcast1 = p1 - inc1,
     broadcast2 = p2 - inc2,
@@ -104,7 +123,7 @@ state_crop_class <- fert_share_wide %>%      # p1 … p4 = Urea,UAN,AA,Other
 ## ── 3. reshape to long form with Method_ID & Proportion ──────────────
 inc_long <- state_crop_class %>%                       # from step2
   select(STATE, CROP, CLASS,
-         starts_with("broadcast"), starts_with("inc")) %>%
+         starts_with("broadcast"), inc1, inc2, inc3, inc4) %>%
   pivot_longer(
     cols           = everything()[-(1:3)],             # all *_1 … *_4
     names_to       = c("type", "Fertilizer_ID"),        #   split name
