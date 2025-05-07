@@ -55,7 +55,7 @@ Fertilizer_form_corn <- Fertilizer_form_corn %>%
   group_by(REGION) %>%
   mutate(PERCENTAGE = (PERCENTAGE/ sum(PERCENTAGE))) %>%
   ungroup() %>%
-  mutate(CROP = "Corn") %>%
+  mutate(CROP = "CORN") %>%
   left_join(FPR, "REGION") %>% 
   select(STATE, REGION, FORM, PERCENTAGE, CROP) %>%
   mutate(CLASS = "ALL CLASSES") # to match wheat
@@ -87,11 +87,11 @@ Fertilizer_form <- Fertilizer_Cao %>%
   filter(Year == 2015) %>%
   mutate(
     Urea = UR, #Cao used different symbols for fertilizers
-    `Urea ammonia nitrate` = AN,
+    `Urea ammonium nitrate` = AN,
     `Anhydrous ammonia` = AnA,
-    `Other N source` = AqA + AS + NS + SN + CN + DAP + MAP + Aps
+    `Other N sources` = AqA + AS + NS + SN + CN + DAP + MAP + Aps
   ) %>%
-  select(Region, Urea, `Urea ammonia nitrate`, `Anhydrous ammonia`, `Other N source`) %>%
+  select(Region, Urea, `Urea ammonium nitrate`, `Anhydrous ammonia`, `Other N sources`) %>%
   rename(REGION = Region) %>%
   pivot_longer(
     cols = -REGION,
@@ -104,7 +104,7 @@ Fertilizer_form <- Fertilizer_Cao %>%
   rename (REGION = REGION.y)
 
 #Imput fertilizer rate for names of other crops (excep corn)
-Crop_noCORN <- read.csv("Outputs/Fertilization_Rate_State_Crop.csv",header=T) %>%
+Crop_noCORN <- read.csv("Outputs/3.1_Fertilization_Rate_State_Crop.csv",header=T) %>%
   filter(CROP != "CORN") %>%
   select(CROP, CLASS)
 
@@ -114,5 +114,5 @@ Fertilizer_form_other <- Fertilizer_form %>%
 
 #save and write csv file
 Fertilizer_form <- rbind(Fertilizer_form_corn, Fertilizer_form_other)
-write.csv(Fertilizer_form, "Outputs/3.2_Fertilizer_form.csv", row.names = FALSE)
+#write.csv(Fertilizer_form, "Outputs/3.2_Fertilizer_form.csv", row.names = FALSE)
 ```

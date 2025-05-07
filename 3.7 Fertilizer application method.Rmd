@@ -1,0 +1,124 @@
+---
+title: "Fertilizer application methods"
+author: "Dr. Chih-Yu Hung"
+date: "2025-04-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+source("setup.R")
+```
+
+## To obtain fertilization application method in different regions in the US. 
+
+The CEAP II (2016) have results for incorporation percentage for different regions. 
+They group the fertilizer incorporation area into all (100% incorporated), some (X% incorporated), and none (0% incorporated). We will estimate fertilizer incorporation proportion based on CEAP II results. 
+
+Here is the considerations and data we have to estimate the proportion of application method. 
+1. I know the incorporation percent in each state, but it's not crop specific. 
+For example, I know 34%, 49% and 17% of agricultural land area are all incorporated, some incorporated and no incorporation in Illinois. This means that it's possible 34+ 49*(0.2~0.9) = 43.8~78.1% of fertilizer is incorporated.
+2. I know there are four types of fertilizer: Urea, urea ammonia nitrate, anhydrous ammonia, and other.
+3. I know the percentage of fertilizer use for each crop at the state level
+For example, I know, to plant corn in Illinois, they used 0% of urea, 21.5% of urea ammonia nitrate, 69.8% of anhydrous ammonia, 8.6% of other nitrogen. The percentage here is based on fertilizer weight.  
+4. Anhydrous ammonia must be incorporated. 
+5. Please note that injection, banding, drilling applications are considered fertilizer incorporated. Any application method that not broadcasting is considered incorporation. 
+6. It is possible that my data has exclusive result. for example, only 20% of land is incorporated, but in that state, it uses 60% of anhydrous ammonia. It is because the incorporated land is not crop specific and both the incorporated land and fertilizer types are estimated based on survey. 
+7. I know how many fertilizer is applied for each crop in a state. I know fertilizer rate and crop land area. For example, in Illinois, Corn's fertilization rate is 110 kg / ha and I know there are 120000 ha in Illinois. The fertilization rate and crop area are various in the states. 
+8. Pro-rata: Stay neutrality for crops. Every crop places the same fraction of non Anhyrous ammonia (not necessarily incorporated). 
+9. Assume application method is identical when double cropping presence.
+10. If 
+
+```{r Read data}
+Fertilizer_form <- read.csv("Outputs/3.2_Fertilizer_form.csv")
+Fertilizer_use <- read.csv("Outputs/3.4_Fertilizer_Use_County_Crop.csv") %>%
+  select(-AREA,-RATE_kg_ha)
+CEAP_Fertilization <- read_xlsx("Inputs/Fertilization practice_CEAP.xlsx")
+#Agr_area_county<- read.csv("Outputs/3.3_Area_County_Crop.csv")
+```
+
+
+## Prepare data before estimate
+
+
+```{r data preparatiin}
+
+## 1.  Build the “land” table
+land <- CEAP_Fertilization                                                    %>%
+  filter(CEAP == 2)                                                           %>% # keep only CEAP-2 rows
+  mutate(Incorporation_type = str_to_lower(Incorporation_type))               %>%
+  mutate(Incorporation_type = recode(Incorporation_type,
+                                     "all"  = "p_all",
+                                     "some" = "p_some",
+                                     "none" = "p_none"))                      %>%
+  select(Region,  IncType = Incorporation_type,  perc = Incorporation_percent) %>%
+  pivot_wider(names_from = IncType, values_from = perc)                       %>%
+  # convert % → fraction if the column is 0–100
+  mutate(across(starts_with("p_"), ~ ifelse(. > 1, . / 100, .)))              %>%
+  left_join(state_crosswalk %>% select(state = full, CEAP), by = c("Region"= "CEAP"))  %>%
+  select(state, p_all, p_some, p_none) %>%
+  mutate(state = toupper(state)) %>%
+  na.omit() #no state in the SC region
+
+## 1.1 Merge land table and area table
+
+land_area <- Agr_area_county %>%
+  left_join(land, by = c("STATE" = "state")) %>% 
+  group_by(STATE,COUNTY,YEAR,CROP,CLASS) %>%
+  #to determine incorporated land area at county level and per crop
+  #beause I have DOULBE so many crops have two rows at the same county and year. NEED to FIX
+  summarise(a_all = AREA * p_all,a_some = AREA * p_some,a_none = AREA * p_none, .groups = "drop") 
+
+
+## 2.  Fertilizer-form shares by crop × class 
+fert_share <- Fertilizer_form                                                 %>%
+  mutate(type = case_when(
+           str_detect(FORM, regex("^urea$",   TRUE)) ~ "Urea",
+           str_detect(FORM, regex("ammonium nitrate",       TRUE)) ~ "UAN",
+           str_detect(FORM, regex("anhyd",     TRUE)) ~ "AA",
+           TRUE                                      ~ "Other"))             %>%
+  group_by(STATE, CROP, CLASS, type)                                          %>%
+  summarise(share = sum(PERCENTAGE), .groups = "drop")                        %>%
+  pivot_wider(names_from = type, values_from = share, values_fill = 0)        %>%
+  ## rescale rows so that Urea+UAN+AA+Other = 1  (guards against rounding)
+  mutate(row_tot = Urea + UAN + AA + Other)                                   %>%
+  mutate(across(Urea:Other, ~ ifelse(row_tot > 0, . / row_tot, 0)))           %>%
+  select(-row_tot)                                                            %>%
+  rename(state = STATE, crop = CROP, class = CLASS)
+
+## 3.  Actual N applied (= W_c)
+fert_use <- Fertilizer_use                                                    %>%
+  group_by(STATE, COUNTY, YEAR, CROP, CLASS)                                        %>% # all years identical wrt method
+  summarise(W_c = sum(FERT_kg), .groups = "drop")                             %>%
+  rename(state = STATE, county = COUNTY, crop = CROP, class = CLASS)
+
+## 4.  Merge shares with use and land corporation
+fert_dat <- fert_use                                                       %>%
+  left_join(fert_share, by = c("state","crop","class"))                    %>%
+  filter(!is.na(AA) & W_c > 0)                                             %>%
+  left_join(land_area, by = c("state" = "STATE",
+                              "county" = "COUNTY",
+                              "YEAR" = "YEAR",
+                              "crop" = "CROP",
+                              "class" = "CLASS")) %>%
+  group_by(state, county, YEAR, crop, class)        %>%    # key columns
+  summarise(
+   ## sum the CEAP shares
+      a_all  = sum(a_all ,  na.rm = TRUE),
+      a_some = sum(a_some,  na.rm = TRUE),
+      a_none = sum(a_none,  na.rm = TRUE),
+         ## keep one copy of the other columns (they are identical inside group)
+      W_c    = first(W_c),
+      AA     = first(AA),
+      Urea   = first(Urea),
+      UAN    = first(UAN),
+      Other  = first(Other),
+      .groups = "drop"
+  )
+```
+
+
+```{}
+
+
+
+```

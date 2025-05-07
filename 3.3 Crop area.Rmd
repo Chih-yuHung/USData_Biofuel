@@ -175,6 +175,9 @@ Agr_area_final <- Agr_area_long %>%
   )) %>%
   mutate(CROP = gsub("DURUM_|SPRING_|WINTER_","",CROP)) %>% #remove the prefixes
   rename(STATE= State, COUNTY = County, YEAR = Year) %>%
+  mutate(COUNTY = COUNTY %>%
+           str_remove(regex("\\s+County$",ignore_case = TRUE)) %>%
+           str_trim())  %>%
   filter(STATE != "DISTRICT OF COLUMBIA")
 
 

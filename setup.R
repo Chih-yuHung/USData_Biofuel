@@ -4,6 +4,8 @@ suppressPackageStartupMessages({
   library(data.table)
   library(lubridate)
   library(soilDB)
+  library(readxl)
+  library(magick)
 })
 
 # ggplot theme
@@ -18,6 +20,6 @@ DATA_PROC <- "data/processed"
 # source("R/functions_soil.R",      local = TRUE)
 
 # for all state's name
-state_crosswalk <- read_csv("state_crosswalk.csv") 
+state_crosswalk <- read_csv("Inputs/state_crosswalk.csv") 
 
 message(">>> setup.R loaded")
