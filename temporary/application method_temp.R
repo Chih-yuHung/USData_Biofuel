@@ -2,8 +2,8 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 
-Fertilizer_form <- read.csv("Outputs/3.2_Fertilizer_form - Copy.csv")
-Fertilizer_use <- read.csv("Outputs/3.4_Fertilizer_Use_County_Crop - Copy.csv") %>%
+Fertilizer_form <- read.csv("../Outputs/Temp/3.2_Fertilizer_form - Copy.csv")
+Fertilizer_use <- read.csv("../Outputs/Temp/3.4_Fertilizer_Use_County_Crop - Copy.csv") %>%
   select(-AREA,-RATE_kg_ha)
 CEAP_Fertilization <- read_xlsx("Inputs/Fertilization practice_CEAP - Copy.xlsx")
 

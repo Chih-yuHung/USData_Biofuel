@@ -15,18 +15,11 @@ The CEAP II (2016) have results for incorporation percentage for different regio
 They group the fertilizer incorporation area into all (100% incorporated), some (X% incorporated), and none (0% incorporated). We will estimate fertilizer incorporation proportion based on CEAP II results. 
 
 Here is the considerations and data we have to estimate the proportion of application method. 
-1. I know the incorporation percent in each state, but it's not crop specific. 
-For example, I know 34%, 49% and 17% of agricultural land area are all incorporated, some incorporated and no incorporation in Illinois. This means that it's possible 34+ 49*(0.2~0.9) = 43.8~78.1% of fertilizer is incorporated.
-2. I know there are four types of fertilizer: Urea, urea ammonia nitrate, anhydrous ammonia, and other.
-3. I know the percentage of fertilizer use for each crop at the state level
-For example, I know, to plant corn in Illinois, they used 0% of urea, 21.5% of urea ammonia nitrate, 69.8% of anhydrous ammonia, 8.6% of other nitrogen. The percentage here is based on fertilizer weight.  
-4. Anhydrous ammonia must be incorporated. 
-5. Please note that injection, banding, drilling applications are considered fertilizer incorporated. Any application method that not broadcasting is considered incorporation. 
-6. It is possible that my data has exclusive result. for example, only 20% of land is incorporated, but in that state, it uses 60% of anhydrous ammonia. It is because the incorporated land is not crop specific and both the incorporated land and fertilizer types are estimated based on survey. 
-7. I know how many fertilizer is applied for each crop in a state. I know fertilizer rate and crop land area. For example, in Illinois, Corn's fertilization rate is 110 kg / ha and I know there are 120000 ha in Illinois. The fertilization rate and crop area are various in the states. 
-8. Pro-rata: Stay neutrality for crops. Every crop places the same fraction of non Anhyrous ammonia (not necessarily incorporated). 
-9. Assume application method is identical when double cropping presence.
-10. If 
+1. Anhydrous ammonia must be incorporated. 
+2. Assume Urea, UAN, and other fertilizers share the same incorporation. If one of fertilizer can't deplete incorporation, the unused quota can be evenly allocated to the rest of other fertilizers. 
+3. It is possible that my data has exclusive result. for example, only 20% of land is incorporated, but in that state, it uses 60% of anhydrous ammonia. It is because the incorporated land is not crop specific and both the incorporated land and fertilizer types are estimated based on survey. 
+4. Pro-rata: Stay neutrality for crops. Every crop places the same fraction of non Anhyrous ammonia (not necessarily incorporated). 
+5. Assume application method is identical when double cropping presence.
 
 ```{r Read data}
 Fertilizer_form <- read.csv("Outputs/3.2_Fertilizer_form.csv")
@@ -41,83 +34,157 @@ CEAP_Fertilization <- read_xlsx("Inputs/Fertilization practice_CEAP.xlsx")
 
 
 ```{r data preparatiin}
+# 1.  State‑level fertilizer‑form shares
+fert_form_clean <- Fertilizer_form %>%
+  mutate(
+    FORM = str_replace_all(FORM,                         # normalise names
+                           c("Urea ammonium nitrate" = "UAN",
+                             "Anhydrous ammonia"      = "AA")),
+    Fertilizer_ID = recode(FORM,
+                           "Urea"  = 1L,
+                           "UAN"   = 2L,
+                           "AA"    = 3L,
+                           "Other N sources" = 4L,
+                           .default = NA_integer_)
+  ) %>%
+  select(STATE, CROP, CLASS, Fertilizer_ID, PERCENTAGE)
 
-## 1.  Build the “land” table
-land <- CEAP_Fertilization                                                    %>%
-  filter(CEAP == 2)                                                           %>% # keep only CEAP-2 rows
-  mutate(Incorporation_type = str_to_lower(Incorporation_type))               %>%
-  mutate(Incorporation_type = recode(Incorporation_type,
-                                     "all"  = "p_all",
-                                     "some" = "p_some",
-                                     "none" = "p_none"))                      %>%
-  select(Region,  IncType = Incorporation_type,  perc = Incorporation_percent) %>%
-  pivot_wider(names_from = IncType, values_from = perc)                       %>%
-  # convert % → fraction if the column is 0–100
-  mutate(across(starts_with("p_"), ~ ifelse(. > 1, . / 100, .)))              %>%
-  left_join(state_crosswalk %>% select(state = full, CEAP), by = c("Region"= "CEAP"))  %>%
-  select(state, p_all, p_some, p_none) %>%
-  mutate(state = toupper(state)) %>%
-  na.omit() #no state in the SC region
+# 2.  County‑year totals of N applied by crop class
+fert_use_agg <- Fertilizer_use %>%
+  select(STATE, COUNTY, YEAR, CROP, CLASS, FERT_kg) %>%
+  group_by(STATE, COUNTY, YEAR, CROP, CLASS) %>%           # drop DOUBLE
+  summarise(FERT_kg = sum(FERT_kg, na.rm = TRUE), .groups = "drop")
 
-## 1.1 Merge land table and area table
+# 3.  CEAP region‑level incorporation fractions (CEAP stratum 2 only)
+ceap_frac <- CEAP_Fertilization %>%
+  filter(CEAP == 2) %>%                                    # keep stratum 2
+  transmute(Region,                                         # two‑letter CEAP code
+            inc_type   = Incorporation_type,               # All/Some/None
+            inc_share  = Incorporation_percent/100)        # convert to fraction
 
-land_area <- Agr_area_county %>%
-  left_join(land, by = c("STATE" = "state")) %>% 
-  group_by(STATE,COUNTY,YEAR,CROP,CLASS) %>%
-  #to determine incorporated land area at county level and per crop
-  #beause I have DOULBE so many crops have two rows at the same county and year. NEED to FIX
-  summarise(a_all = AREA * p_all,a_some = AREA * p_some,a_none = AREA * p_none, .groups = "drop") 
+# 4.  attach CEAP code to every state name 
+state2ceap <- state_crosswalk %>%
+  select(full, CEAP) %>%
+  rename(STATE = full, Region = CEAP)
+
+# 5. ceap_frac_state: per‐state incorporated / some / none shares
+ceap_frac_state <- state2ceap %>%
+  left_join(ceap_frac, by = "Region") %>%                       # adds inc_type & inc_share
+  mutate(STATE = toupper(STATE))
 
 
-## 2.  Fertilizer-form shares by crop × class 
-fert_share <- Fertilizer_form                                                 %>%
-  mutate(type = case_when(
-           str_detect(FORM, regex("^urea$",   TRUE)) ~ "Urea",
-           str_detect(FORM, regex("ammonium nitrate",       TRUE)) ~ "UAN",
-           str_detect(FORM, regex("anhyd",     TRUE)) ~ "AA",
-           TRUE                                      ~ "Other"))             %>%
-  group_by(STATE, CROP, CLASS, type)                                          %>%
-  summarise(share = sum(PERCENTAGE), .groups = "drop")                        %>%
-  pivot_wider(names_from = type, values_from = share, values_fill = 0)        %>%
-  ## rescale rows so that Urea+UAN+AA+Other = 1  (guards against rounding)
-  mutate(row_tot = Urea + UAN + AA + Other)                                   %>%
-  mutate(across(Urea:Other, ~ ifelse(row_tot > 0, . / row_tot, 0)))           %>%
-  select(-row_tot)                                                            %>%
-  rename(state = STATE, crop = CROP, class = CLASS)
+# 6.  CEAP → state: keep All & Some separately 
+incorp_state <- ceap_frac_state %>%          # CEAP = 2 only, from earlier step
+  summarise(A = sum(inc_share[inc_type == "All" ], na.rm=TRUE),
+            S = sum(inc_share[inc_type == "Some"], na.rm=TRUE),
+            .by = STATE)                     # A = “all”, S = “some” (0–1 scale)
 
-## 3.  Actual N applied (= W_c)
-fert_use <- Fertilizer_use                                                    %>%
-  group_by(STATE, COUNTY, YEAR, CROP, CLASS)                                        %>% # all years identical wrt method
-  summarise(W_c = sum(FERT_kg), .groups = "drop")                             %>%
-  rename(state = STATE, county = COUNTY, crop = CROP, class = CLASS)
-
-## 4.  Merge shares with use and land corporation
-fert_dat <- fert_use                                                       %>%
-  left_join(fert_share, by = c("state","crop","class"))                    %>%
-  filter(!is.na(AA) & W_c > 0)                                             %>%
-  left_join(land_area, by = c("state" = "STATE",
-                              "county" = "COUNTY",
-                              "YEAR" = "YEAR",
-                              "crop" = "CROP",
-                              "class" = "CLASS")) %>%
-  group_by(state, county, YEAR, crop, class)        %>%    # key columns
-  summarise(
-   ## sum the CEAP shares
-      a_all  = sum(a_all ,  na.rm = TRUE),
-      a_some = sum(a_some,  na.rm = TRUE),
-      a_none = sum(a_none,  na.rm = TRUE),
-         ## keep one copy of the other columns (they are identical inside group)
-      W_c    = first(W_c),
-      AA     = first(AA),
-      Urea   = first(Urea),
-      UAN    = first(UAN),
-      Other  = first(Other),
-      .groups = "drop"
-  )
+# 7.  put fertiliser shares (p1 … p4) in wide form 
+fert_share_wide <- fert_form_clean %>%                    # still state‑level
+  select(STATE, CROP, CLASS, Fertilizer_ID, PERCENTAGE) %>%
+  mutate(Fertilizer_ID = factor(Fertilizer_ID, levels = 1:4)) %>%
+  pivot_wider(names_from = Fertilizer_ID,
+              values_from = PERCENTAGE,
+              values_fill = 0,
+              names_prefix = "p")        
 ```
 
+## Calcualte the incorporation proportion
+```{r inc calculation}
+#  Join with fertiliser shares and apply the new logic -------------
+state_crop_class <- fert_share_wide %>%      # p1 … p4 = Urea,UAN,AA,Other
+  left_join(incorp_state, by = "STATE") %>%          # add A,S
+  replace_na(list(A = 0, S = 0)) %>%
+  rowwise() %>%
+  mutate(
+    # ------------------------------------------------------------------
+    # demanded AA incorporation & available capacity
+    need_AA   = p3,
+    cap_total = A + S,
+    # ------------------------------------------------------------------
+    # AA takes first from A, then from S
+    inc3 = need_AA,                  #              AA gets all it needs
+    A_left = ifelse(need_AA >= A, 0, A - need_AA), # "All" left after AA
+    S_drawn = pmax(need_AA - A, 0),           # what AA had to draw from “Some”
+    S_left  = pmax(S - S_drawn, 0),           # remainder of “Some”
+    # ------------------------------------------------------------------
+    # what can other ferts still incorporate?
+    addl_incorp = A_left + 0.5 * S_left,         # ½ of remaining “Some”
+    n_avail     = (p1 > 0) + (p2 > 0) + (p4 > 0),   # how many (1/2/4) present
+    inc_other   = addl_incorp / n_avail,           # split evenly to 1,2,4
+    
+    inc1_init   = ifelse(p1 > 0, pmin(p1, inc_other), 0),
+    inc2_init   = ifelse(p2 > 0, pmin(p2, inc_other), 0),
+    inc4_init   = ifelse(p4 > 0, pmin(p4, inc_other), 0),
+    used_init   = inc1_init + inc2_init + inc4_init,
+    rem_incorp  = addl_incorp - used_init,         # still unused capacity
+    # cap at each fertiliser’s total share
+    inc1 = pmin(p1, inc_other),
+    inc2 = pmin(p2, inc_other),
+    inc4 = pmin(p4, inc_other),
+    
+    # remaining head‑room for each fert
+    head1   = pmax(p1 - inc1_init, 0),
+    head2   = pmax(p2 - inc2_init, 0),
+    head4   = pmax(p4 - inc4_init, 0),
+    head_sum = head1 + head2 + head4,
+    
+    # ── 2∘ pass: distribute remainder proportional to head‑room ───────
+    incr_factor = ifelse(head_sum > 0, rem_incorp / head_sum, 0),
+    
+    inc1 = inc1_init + head1 * incr_factor,
+    inc2 = inc2_init + head2 * incr_factor,
+    inc4 = inc4_init + head4 * incr_factor,
+    
+    # ------------------------------------------------------------------
+    broadcast1 = p1 - inc1,
+    broadcast2 = p2 - inc2,
+    broadcast3 = p3 - inc3,        # will be zero except if AA > capacity (rare)
+    broadcast4 = p4 - inc4,
+    .keep = "unused"
+  ) %>%
+  ungroup() %>%
+  rename_with(~ gsub("_", "", .x),              # drop underscores
+              starts_with(c("broadcast_", "inc_"))) %>%
+  select(-incother)                             # drop incother
+```
 
-```{}
+## Arrange for results and export
+```{r export data}
+# reshape to long form with Method_ID & Proportion ──────────────
+inc_long <- state_crop_class %>%                       # from step2
+  select(STATE, CROP, CLASS,
+         starts_with("broadcast"), inc1, inc2, inc3, inc4) %>%
+  pivot_longer(
+    cols           = everything()[-(1:3)],             # all *_1 … *_4
+    names_to       = c("type", "Fertilizer_ID"),        #   split name
+    names_pattern  = "(broadcast|inc)_?(\\d)",            #   by regex
+    values_to      = "share_abs"
+  ) %>%
+  mutate(
+    Fertilizer_ID = as.integer(Fertilizer_ID),          # "1","2",… → int
+    Method_ID     = if_else(type == "broadcast", 1L, 2L)
+  ) %>%
+  ## convert absolute share to proportion within each fertiliser
+  group_by(STATE, CROP, CLASS, Fertilizer_ID) %>%
+  mutate(
+  total_share = sum(share_abs, na.rm = TRUE)) %>%
+  mutate(Proportion = ifelse(total_share >0, share_abs / total_share, 0)) %>%
+  ungroup() %>%
+  select(STATE, CROP, CLASS, Fertilizer_ID, Method_ID, Proportion) %>%
+  arrange(STATE, CROP, CLASS, Fertilizer_ID, Method_ID)
+
+
+# expand to county × year ----------------------------------------
+final_table <- fert_use_agg %>%                  # keys STATE,COUNTY,YEAR,CROP,CLASS
+  distinct(STATE, COUNTY, YEAR, CROP, CLASS) %>%
+  left_join(inc_long, by = c("STATE", "CROP", "CLASS")) %>%
+  arrange(STATE, COUNTY, YEAR, CROP, CLASS, Fertilizer_ID, Method_ID) %>%
+  filter(Proportion >= 0)
+
+## final_table  contains:
+## STATE | COUNTY | YEAR | CROP | CLASS | Fertilizer_ID | Method_ID | Proportion
+write.csv(final_table,"Outputs/3.7 Fertilizer app method.csv", row.names = FALSE)
 
 
 
