@@ -1,0 +1,220 @@
+---
+title: "2.6 Irrigation"
+author: "Dr. Chih-Yu Hung"
+date: "2025-04-14"
+output: html_document
+---
+
+## Irrigation land in the US
+
+In the US NIR, "irrigation is modeled by assuming that water is applied to the level of field capacity on the day after the soil drains to 60 percent of field capacity in the DayCent model simulation. To the extend the time series to 1950, the amount of NRI survey locations with irrigation are scaled backward in time from 1979 to 1950 using historical data on irrigation management
+(Haines et al. 2018).
+
+
+The irrigation data in the US census have two parts, 1. total irrigated land in the states and 2. irrigated land for specific crops. They have COUNTY LEVEL data for irrigated land, but many data are suppressed. Use total irrigated land area at State level. 
+
+Irrigation data is from Census 2017 and 2022. Since we'd like data from 2018-2022 (the average), I'm using their average to represent irrigation fraction for each crop in each state. 
+
+
+HOWEVER, in Canada's methodology, we assumed that irrigation occurs when PET < P. This means I can determine the irrigation proportion for target crops at county level. 
+
+Reconciling the two concepts! 
+
+1. Determine irrigation T/F in a county. (PRE and PET)
+2. Calculate irrigation percentage in a state (The T/F and county area)
+3. Calculate irrigation percentage from USDA's census. 
+4. Check disagreement classes between Canada's method and USDA's census results. 
+5. Type A conflict: low irrigation percentage from PRE and PET, but high in census. 
+              Solution: It is possible that farmer have insurance irrigation. go to census. 
+   Type B conflict: high irrigation percentage from PRE and PET, but low in census. 
+              Solution: It is possible that there is a survey bias. go to Canada's method.     
+
+
+
+```{r setup}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("setup.R")
+
+#Only included the target crops
+load("Inputs/data_crop_2022.RData")
+load("Inputs/data_crop_2017.RData")
+PRE_PET <-read.csv("Outputs/1.2_PET&PRE_County_30y.csv")
+NGS <- read.csv("Outputs/1.3_Non-growing season_30y.csv")
+Agr_area <- read.csv("Outputs/3.3_Agriculture_area.csv") %>%
+  select(State, County, Year, Total_Ag_area) %>%
+  mutate(
+    County = str_remove(County, "\\s*County") %>%
+    str_trim()
+  )
+```
+
+### Data from PET and PRE to determine if irrigation presence.
+
+
+```{r Prepare the data}
+#Determine irrigation T/F based on PET and PRE
+PRE_PET_NGS <- PRE_PET %>% 
+  left_join(NGS, by = c("COUNTY" = "County", "STATE" = "State")) %>%
+  mutate(EF_G_PRE = exp(0.00558*GROW_PRE-7.701),             # determine ratio factor
+          EF_NG_PRE = exp(0.00558*NGROW_PRE-7.701),
+          EF_G_PET = exp(0.00558*NGROW_PET-7.701),
+          EF_NG_PET = exp(0.00558*NGROW_PET-7.701),
+          RF_G = EF_G_PET/EF_G_PRE,
+          RF_NG = EF_NG_PET/EF_G_PRE) %>%
+  select(COUNTY,STATE,NGS, RF_G, RF_NG) %>%
+  mutate(IRRI_G = ifelse(RF_G >=1, "Y", "N"),
+         IRRI_NG = ifelse(RF_NG >=1, "Y", "N")
+         )
+# The results show that irrigation presence in growing or non growing seasons is sync. 
+# There is no place has irrigation in growing but not in non-growing.
+
+#Calculate the irrigation percentage based on the T/F and area
+Irri_percent <- Agr_area %>%
+  left_join(PRE_PET_NGS, by = c("State" = "STATE", "County" = "COUNTY")) %>%
+  select(-RF_G, -RF_NG) %>%
+  group_by(State) %>%
+  summarise(
+    Irri_percent = sum(Total_Ag_area[IRRI_G == "Y"], na.rm = TRUE)/
+                   sum(Total_Ag_area, na.rm = TRUE)
+    )
+  
+```
+
+### Operated area
+To know the total area that could have tillage operation, filters were applied
+1. PRODN_PRACTICE_DESC = "ALL PRODUCTION PRACTICES"
+2. STATISTICCAT_DEC = "AREA HARVESTED"
+3. UNIT_DESC = "ACRES"
+4. DOMAIN_DESC = "AREA OPERATED"
+5. AGG_LEVEL_DESC = "STATE"  (to get state level data)
+
+After the filter, sum of "VALUE" is the total area (acre) for the crop in the state.
+
+
+```{r area data}
+#To filter the total area data in 2022 and 2017
+data_area_2022 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot))
+  
+
+data_area_2017 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot))
+
+```
+
+
+### Irrigation
+
+``` {r irrigation area}
+#To filter the irrigation data in 2022 and 2017
+data_Irri_2022 <- data_2022 %>%
+  filter(PRODN_PRACTICE_DESC == "IRRIGATED") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC %in% c("ACRES")) %>% 
+  filter(DOMAIN_DESC == "AREA HARVESTED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot)) %>%
+  mutate(SHORT_DESC = str_remove(SHORT_DESC, ",\\s*IRRIGATED") %>%  # drop the phrase
+                 str_trim())                                      # clean up any spaces
+
+
+
+data_Irri_2017 <- data_2017 %>%
+  filter(PRODN_PRACTICE_DESC == "IRRIGATED") %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+  filter(UNIT_DESC %in% c("ACRES")) %>% 
+  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(AGG_LEVEL_DESC == "STATE") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  summarise(Area_tot = sum(Area_tot)) %>%
+  mutate(SHORT_DESC = str_remove(SHORT_DESC, ",\\s*IRRIGATED") %>%  # drop the phrase
+                 str_trim())                                      # clean up any spaces
+
+#Join the data to determine irrigation fraction
+Frac_irri_2022 <- data_area_2022 %>%
+  left_join(data_Irri_2022, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC")) %>%
+  mutate(Frac_irri = Area_tot.y/Area_tot.x)
+
+Frac_irri_2017 <- data_area_2017 %>%
+  left_join(data_Irri_2017, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC")) %>%
+  mutate(Frac_irri = Area_tot.y/Area_tot.x)
+
+
+# Join the two census data (note that some crops didn't have irrigation in 2017)
+Frac_irri <- Frac_irri_2022 %>%
+  left_join(Frac_irri_2017, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC"))%>%
+  rename(
+    Area_tot_2022  = Area_tot.x.x,
+    Area_irri_2022 = Area_tot.y.x,
+    Frac_irri_2022 = Frac_irri.x,
+    Area_tot_2017  = Area_tot.x.y,
+    Area_irri_2017 = Area_tot.y.y,
+    Frac_irri_2017 = Frac_irri.y
+  ) %>% 
+  # turn every NA **or** NaN in numeric columns into 0
+  mutate(
+    across(
+      where(is.numeric),
+      ~ replace_na(replace(.x, is.nan(.x), NA), 0)
+    )
+  )
+
+```
+
+### Reconcile the USDA's census data and Canada's methodolgy
+
+```{r Reconcilation}
+Frac_irri_recon <- Frac_irri %>%
+  left_join(Irri_percent, by = c("STATE_NAME" = "State")) %>%
+  mutate(
+    # 1 ─ helper: row-wise average of the two survey years
+    mean_17_22 = rowMeans(cbind(Frac_irri_2017, Frac_irri_2022), na.rm = TRUE),
+    
+    # 2 ─ classify the row
+    conflict_class = case_when(
+      mean_17_22  ==   0           ~ "OK",           # mean no irrigation even PET > PRE
+      Irri_percent  <  mean_17_22  ~ "A_conflict",  # irri% lower than survey avg
+      Irri_percent  >  mean_17_22  ~ "B_conflict",  # irri% higher than survey avg
+      TRUE                         ~ "OK"
+    ),
+    
+    # 3 ─ generate the reconciled irrigation fraction
+    Frac_irri_final = case_when(
+      conflict_class == "A_conflict" ~ pmax(Frac_irri_2017, Frac_irri_2022, na.rm = TRUE),
+      conflict_class == "B_conflict" ~ Irri_percent,
+      TRUE                           ~ mean_17_22     # keep the average when they agree
+    )) %>%
+   mutate(
+    Frac_IRRI = ifelse(Frac_irri_final> 1, 1, Frac_irri_final)) %>%
+   select(COMMODITY_DESC,SHORT_DESC,STATE_NAME,Frac_IRRI) %>%
+   rename(STATE = STATE_NAME)  
+
+#write.csv(Frac_irri_recon, "Outputs/2.6_Irrigation fraction.csv")
+
+```
+
+
+
+
+

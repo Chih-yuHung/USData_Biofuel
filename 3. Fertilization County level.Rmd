@@ -82,7 +82,21 @@ Fert_County_1822 <- Fert_County_2012 %>%
 (CY, 2025 Jan 09)
 
 ```{r retrieve survey data for fertilzation rate}
-#Fertrate_2018-22/RData prepared by 3.1 Fertilization rate
+#  US_environment <- fread("qs.environmental_20250114.txt/qs.environmental_20250114.txt")
+# # 
+# Fert_rate <- US_environment %>%
+#   filter(SOURCE_DESC == "SURVEY") %>% #keep CENSUS data only
+#   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+#   filter(YEAR %in% c(2018:2022)) %>%
+#   filter(COMMODITY_DESC %in% c("CORN","SORGHUM","GRAIN",
+#                                "WHEAT","SOYBEANS","OATS","BARLEY",
+#                                "SWEET CONR","PEAS","RYE","CANOLA",
+#                                "TRITICALE","CAMELINA")) %>%
+#   filter(DOMAINCAT_DESC == "FERTILIZER: (NITROGEN)") %>%
+#   filter(UNIT_DESC == "LB / ACRE / YEAR, AVG") %>%
+#   select(COMMODITY_DESC,CLASS_DESC,STATE_ALPHA,STATE_NAME,YEAR,VALUE)
+# save(Fert_rate, file = "Inputs/Fertrate_2018-22.RData")
+
 load("Inputs/Fertrate_2018-22.RData") #unit lb /acre
 
 Fert_rate <- Fert_rate %>%

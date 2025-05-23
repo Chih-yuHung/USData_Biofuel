@@ -95,7 +95,7 @@ Agr_area <- Crop_area %>%
 #Consider the area of Dbl crops, I will deal with major Dbl crop only (they have 92.3% of Dbl crops)
 #This include "Winter wht+soybean"(75%) , "Winter wht +corn"(7.2%)  "Winter wht + Sorghum"(6.8%),  "Triticale +corn"(3.1%) Jan. 31. 
           
-
+#write.csv(Agr_area,"Outputs/3.3_Agriculture_area.csv",row.names = FALSE)
 ```
 
 ## Deal with the double crop area. 
@@ -193,7 +193,7 @@ Agr_area_final <- Agr_area_long %>%
 This is for Antoine's work
 
 ```{r State aggregated area data}
-Agr_area_state <- Agr_area_final %>  %
+Agr_area_state <- Agr_area_final %>%
   group_by(STATE, YEAR, CROP, CLASS, DOUBLE) %>%
   summarise(State_area = sum (AREA, na.rm = TRUE)) %>%
   group_by(STATE, CROP, CLASS, DOUBLE) %>%
