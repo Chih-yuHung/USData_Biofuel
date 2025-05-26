@@ -55,12 +55,8 @@ Agr_area <- read.csv("Outputs/3.3_Agriculture_area.csv") %>%
 #Determine irrigation T/F based on PET and PRE
 PRE_PET_NGS <- PRE_PET %>% 
   left_join(NGS, by = c("COUNTY" = "County", "STATE" = "State")) %>%
-  mutate(EF_G_PRE = exp(0.00558*GROW_PRE-7.701),             # determine ratio factor
-          EF_NG_PRE = exp(0.00558*NGROW_PRE-7.701),
-          EF_G_PET = exp(0.00558*NGROW_PET-7.701),
-          EF_NG_PET = exp(0.00558*NGROW_PET-7.701),
-          RF_G = EF_G_PET/EF_G_PRE,
-          RF_NG = EF_NG_PET/EF_G_PRE) %>%
+  mutate(RF_G = GROW_PET/GROW_PRE,
+         RF_NG = NGROW_PET/NGROW_PRE) %>%
   select(COUNTY,STATE,NGS, RF_G, RF_NG) %>%
   mutate(IRRI_G = ifelse(RF_G >=1, "Y", "N"),
          IRRI_NG = ifelse(RF_NG >=1, "Y", "N")

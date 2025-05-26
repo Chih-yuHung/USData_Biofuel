@@ -6,7 +6,7 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
-source("R/setup.R")
+source("setup.R")
 
 Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
 PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")
@@ -48,12 +48,71 @@ US_Direct <- Fert_County_Crop %>%
 
 
 
-## Indirect N2O EF
-### Leaching EF
- Leaching EFs only require precipitation data and fertilizer data 
+## Indirect N2O
+### volatilization
+Volatilization require multiple soil properties and fertilizer data
+
+```{r volatilization}
+#Example for SiteData
+#   RegionID:        suggest using HUP
+#   ProvinceID:      Province or State ID
+#   Year:            
+#   CropID:          Name of crop
+#   Crop_coef:       characteristic, Annual or Perennial
+#   Fert_coef:       characteristic, Urea, Urea ammonia, Anhydrous ammonia, and Other
+#   Method_ID_coef:  numeric, Broadcast (1) and Incorporated (2 or 3)
+#   SoilpH:          numeric, -1 (<7.25) and 0 (>7.25)
+#   SoilCEC:         numeric, or -1 (<250) and 0 (>250)
+#   Climate          Temperate or Tropical
+#   Percentage:      Percentage of soil condition (the combination of pH and CEC, sum of them must be 1)
+#   Fraction:        Fraction of fertilizer
+#   Proportion:      Proportion of application method
+#   Fertilizer_Applied: The amount of applied fertilizer (kg)
+#   Ecozone:         Ecozone for the Region, wet and dry. Criteria identical to irrigation
+
+#NOTE that these are all at STATE LEVEL
+Soil_pH    <- read.csv("Outputs/2.3_Soil pH.csv")
+Soil_CEC   <- read.csv("Outputs/2.4_Soil CEC.csv")
+Fert_form  <- read.csv("Outputs/3.2_Fertilizer_form.csv")
+Fert_method <- read.csv("Outputs/3.7 Fertilizer app method_STATE.csv")
+
+#Prepare soil condition percentage 
+Soil_percentage <- Soil_pH %>%
+             left_join(Soil_CEC, by = "State") %>%
+             mutate(Percentage = Fraction.x * Fraction.y) %>%
+             select(State, SoilpH, SoilCEC, Percentage)
+
+#Prepare fertilizer form, method at State level
+Fert_form_method <- Fert_method %>%
+                    mutate(Fert_coef = 
+                           case_when(
+                           Fertilizer_ID == 1 ~ "Urea",
+                           Fertilizer_ID == 2 ~ "Urea ammonium nitrate",
+                           Fertilizer_ID == 3 ~ "Anhydrous ammonia",
+                           TRUE ~ "Other"
+                           )) %>%
+                    left_join(Fert_form, by = c("STATE", "CROP", "CLASS", "Fert_coef" = "FORM")) %>%
+                    rename(Fraction = PERCENTAGE) %>%
+                    select(-Fertilizer_ID,-REGION)
+
+                   
+#Prepare the SiteData for US volatilization
+US_vola <- US_Direct %>%
+  select(STATE:PE) %>%
+  left_join(Soil_percentage, by = c("STATE" = "State")) %>%
+  left_join(Fert_form_method, by = c("STATE", "CROP", "CLASS"))
+   
+
+#write.csv(US_vola, "Outputs/0.2_US_volatilization.csv", row.names = F) >1.2GB too large
+save(US_vola,file= "Outputs/0.2_US_volatilization.RData") #Only 10MB
+```
+
+
+
+### Leaching
+ Leaching  only require precipitation data and fertilizer data 
  
 ```{r Leaching EF}
-
 #Prepare the P and PE for crops 
 US_leaching <- Fert_County_Crop %>%
   left_join(PRE_PET, by = c("STATE", "COUNTY")) %>%
@@ -71,6 +130,6 @@ US_leaching <- Fert_County_Crop %>%
   ) %>%
   select(STATE, COUNTY, YEAR, CROP, CLASS, DOUBLE, Fert_LCA_kg, P, PE)
 
-write.csv(US_leaching, "Outputs/0.3_US_leaching.csv", row.names = F) 
+#write.csv(US_leaching, "Outputs/0.3_US_leaching.csv", row.names = F) 
 ```
  

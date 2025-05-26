@@ -113,6 +113,11 @@ Fertilizer_form_other <- Fertilizer_form %>%
   crossing(Crop_noCORN)
 
 #save and write csv file
-Fertilizer_form <- rbind(Fertilizer_form_corn, Fertilizer_form_other)
+Fertilizer_form <- rbind(Fertilizer_form_corn, Fertilizer_form_other) %>%
+  mutate(
+    FORM = case_when(
+      FORM == "Other N sources" ~ "Other",
+      TRUE ~  FORM)
+    )
 #write.csv(Fertilizer_form, "Outputs/3.2_Fertilizer_form.csv", row.names = FALSE)
 ```

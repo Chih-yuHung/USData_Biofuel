@@ -44,7 +44,7 @@ fert_form_clean <- Fertilizer_form %>%
                            "Urea"  = 1L,
                            "UAN"   = 2L,
                            "AA"    = 3L,
-                           "Other N sources" = 4L,
+                           "Other" = 4L,
                            .default = NA_integer_)
   ) %>%
   select(STATE, CROP, CLASS, Fertilizer_ID, PERCENTAGE)
@@ -174,17 +174,21 @@ inc_long <- state_crop_class %>%                       # from step2
   select(STATE, CROP, CLASS, Fertilizer_ID, Method_ID, Proportion) %>%
   arrange(STATE, CROP, CLASS, Fertilizer_ID, Method_ID)
 
+## final_table  contains:
+## STATE | CROP | CLASS | Fertilizer_ID | Method_ID | Proportion
+#write.csv(inc_long,"Outputs/3.7 Fertilizer app method_STATE.csv", row.names = FALSE)
 
-# expand to county × year ----------------------------------------
-final_table <- fert_use_agg %>%                  # keys STATE,COUNTY,YEAR,CROP,CLASS
-  distinct(STATE, COUNTY, YEAR, CROP, CLASS) %>%
-  left_join(inc_long, by = c("STATE", "CROP", "CLASS")) %>%
-  arrange(STATE, COUNTY, YEAR, CROP, CLASS, Fertilizer_ID, Method_ID) %>%
-  filter(Proportion >= 0)
+
+# expand to county × year, not necessary for STATE level data
+# final_table <- fert_use_agg %>%                  # keys STATE,COUNTY,YEAR,CROP,CLASS
+#   distinct(STATE, COUNTY, YEAR, CROP, CLASS) %>%
+#   left_join(inc_long, by = c("STATE", "CROP", "CLASS")) %>%
+#   arrange(STATE, COUNTY, YEAR, CROP, CLASS, Fertilizer_ID, Method_ID) %>%
+#   filter(Proportion >= 0)
 
 ## final_table  contains:
 ## STATE | COUNTY | YEAR | CROP | CLASS | Fertilizer_ID | Method_ID | Proportion
-write.csv(final_table,"Outputs/3.7 Fertilizer app method.csv", row.names = FALSE)
+#write.csv(final_table,"Outputs/3.7 Fertilizer app method_STATE.csv", row.names = FALSE)
 
 
 
