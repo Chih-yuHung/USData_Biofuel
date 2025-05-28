@@ -27,8 +27,8 @@ The fertilization rate (kg/ha) is State and crop specific, we need to join them 
 ```{r join data}
 
 Fertilizer_County_Crop <- Area_County_Crop %>%
-  left_join(
-    Fertilization_Rate_State_Crop %>% select(CROP, CLASS, STATE, `RATE_kg_ha`),
+  left_join(Fertilization_Rate_State_Crop %>% 
+            select(CROP, CLASS, STATE, `RATE_kg_ha`),
             by= c("STATE","CROP","CLASS") 
             ) %>%
   left_join(
@@ -43,7 +43,6 @@ Fertilizer_County_Crop <- Area_County_Crop %>%
   mutate(`FERT_kg` = AREA * RATE_kg_ha) %>% #Calculate the total fertilizer used
   #filter(AREA != 0) %>%
   mutate(COUNTY = str_remove(COUNTY, " County$"))
-
 
 
 #To check which CROP with NA (no fertilization rate), done, filled the data gap with 3.1_Fertilization_Rate_US_NoCrop
