@@ -186,7 +186,7 @@ inc_long <- state_crop_class %>%                       # from step2
 #   arrange(STATE, COUNTY, YEAR, CROP, CLASS, Fertilizer_ID, Method_ID) %>%
 #   filter(Proportion >= 0)
 
-## final_table  contains:
+## final_table (for county x year)  contains:
 ## STATE | COUNTY | YEAR | CROP | CLASS | Fertilizer_ID | Method_ID | Proportion
 #write.csv(final_table,"Outputs/3.7 Fertilizer app method_STATE.csv", row.names = FALSE)
 

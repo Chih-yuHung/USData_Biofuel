@@ -28,7 +28,9 @@ na.omit(.) # Some rows with NA as there is no value in CNTY_FERT_1987-2012
 #Adjust the fertilizer use for crops 
 Fert_County_Crop <- Fertilizer_County_Crop %>%
 left_join(Fert_Calibration, by = c("STATE", "COUNTY", "YEAR")) %>%
-mutate(Fert_LCA_kg = FERT_kg/RATIO) %>%
+mutate(Fert_LCA = FERT_kg/RATIO) %>%
+mutate(Fert_LCA_2 = ifelse(is.na(Fert_LCA),FERT_kg,Fert_LCA)) %>%
+mutate(Fert_LCA_kg = coalesce(Fert_LCA, Fert_LCA_2)) %>%
 select(STATE,COUNTY,YEAR,CROP, CLASS, DOUBLE,Fert_LCA_kg, AREA)
 
 #write.csv(Fert_County_Crop,"Outputs/3.0_Fertilizer_County_Crop_LCA.csv",row.names = FALSE)
@@ -37,8 +39,11 @@ select(STATE,COUNTY,YEAR,CROP, CLASS, DOUBLE,Fert_LCA_kg, AREA)
 
 
 ##NOTE IMPOTANT!!!!!
+### Updated in  2025 MAy 28, CY
+The Fertilizer use in my 3.0_Fertilizer_County_Crop_LCA.csv was reconciled with NIR's N fertilizer data. I estimated fertilization rate and area to know fertilizer use at county level, and reconcilie them with NIR's data. Note that NIR doesn't not estimate fertilizer use in some counties (~1% of crop area). The fertilizer amounts of the counties are estimated by recommended fertilization rate x area. 
 ### BEfore I do anything remember that this fertilzation amount is the total of all crops. I only want some crops. The sum of fertilzer of the interested crop must be less than the total fertilizer in this list. 
 (CY, 2025 Jan 09)
+
 
 ```{r retrieve survey data for fertilzation rate}
 #  US_environment <- fread("qs.environmental_20250114.txt/qs.environmental_20250114.txt")
