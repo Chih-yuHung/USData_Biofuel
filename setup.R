@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(soilDB)
   library(readxl)
   library(magick)
+  library(here)
 })
 
 # ggplot theme

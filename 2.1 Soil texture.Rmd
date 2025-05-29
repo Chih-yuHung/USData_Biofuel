@@ -53,7 +53,9 @@ for (state_code in state_crosswalk$abbr) {
   soil_texture <- get_SDA_property(
     property = c("sandtotal_r", "silttotal_r", "claytotal_r"),
     method = "Weighted Average",
-    WHERE = paste0("areasymbol LIKE '", state_code, "%'")
+    WHERE = paste0("areasymbol LIKE '", state_code, "%'"),
+    top_depth = 0,
+    bottom_depth = 30
   ) %>% select(mukey, sandtotal_r, silttotal_r, claytotal_r)
 
   # Fetch area data using mukey from get_mapunit_from_SDA()
