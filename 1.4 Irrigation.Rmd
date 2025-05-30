@@ -206,7 +206,7 @@ Frac_irri_recon <- Frac_irri %>%
    select(COMMODITY_DESC,SHORT_DESC,STATE_NAME,Frac_IRRI) %>%
    rename(STATE = STATE_NAME)  
 
-#write.csv(Frac_irri_recon, "Outputs/2.6_Irrigation fraction.csv")
+#write.csv(Frac_irri_recon, "Outputs/1.4_Irrigation fraction.csv",row.names=FALSE)
 
 ```
 

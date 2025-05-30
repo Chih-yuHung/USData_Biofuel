@@ -39,30 +39,16 @@ To know the total area that could have tillage operation, filters were applied
 
 After the filter, sum of "VALUE" is the total area (acre) for the crop in the state.
 
-```{r cars}
-
-# data_2022 <- US_census_crop %>%
-#   filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
+```{r obtain data for target crops}
+# data_2022 <- US_census2022 %>%
 #   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
-#   filter(YEAR %in% c(2022)) %>%
-#   filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
-#                                "WHEAT","SOYBEANS","OATS","BARLEY",
-#                                "SWEET CONR","PEAS","RYE","CANOLA",
-#                                "TRITICALE","CAMELINA"))
-# 
-# save(data_2022, file = "Inputs/data_crop_2022.RData")
+#   filter(COMMODITY_DESC %in% toupper(target_crops))
+#save(data_2022, file = "Inputs/data_crop_2022.RData")
 
- # data_2017 <- US_census_crop %>%
- #  filter(SOURCE_DESC == "CENSUS") %>% #keep CENSUS data only
- #  filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
- #  filter(YEAR %in% c(2017)) %>%
- #  filter(COMMODITY_DESC %in% c("CORN","BEANS","SORGHUM","GRAIN",
- #                               "WHEAT","SOYBEANS","OATS","BARLEY",
- #                               "SWEET CONR","PEAS","RYE","CANOLA",
- #                               "TRITICALE","CAMELINA"))
-
+# data_2017 <- US_census2017 %>%
+#   filter(!(STATE_ALPHA %in% c("AK","GU","AS","PR","VI","MP","","HI",""))) %>% #exclude territories, HI and AK
+#   filter(COMMODITY_DESC %in% toupper(target_crops))
 #save(data_2017, file = "Inputs/data_crop_2017.RData")
-
 
 load("Inputs/data_crop_2022.RData")
 load("Inputs/data_crop_2017.RData")
