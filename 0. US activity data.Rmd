@@ -10,7 +10,7 @@ source("setup.R")
 
 Fert_County_Crop <- read_csv("Outputs/3.0_Fertilizer_County_Crop_LCA.csv")
 PRE_PET <- read_csv("Outputs/1.2_PET&PRE_County_30y.csv")
-Topo <- read_csv("Outputs/2.2_Soil topo_low.csv")
+Topo <- read_csv("Outputs/2.2_Soil topo.csv")
 NGS <- read_csv("Outputs/1.3_Non-growing season_30y.csv")
 Texture <-read_csv("Outputs/2.1_Soil texture.csv")
 ```
@@ -68,7 +68,7 @@ Volatilization require multiple soil properties and fertilizer data
 #   Fraction:        Fraction of fertilizer
 #   Proportion:      Proportion of application method
 #   Fertilizer_Applied: The amount of applied fertilizer (kg)
-#   Ecozone:         Ecozone for the Region, wet and dry. Criteria identical to irrigation
+#   Ecozone:         Ecozone for the Region, wet and dry based on annual PET and PRE!
 
 #NOTE that these are all at STATE LEVEL
 Soil_pH    <- read.csv("Outputs/2.3_Soil pH.csv")
@@ -95,16 +95,23 @@ Fert_form_method <- Fert_method %>%
                     rename(Fraction = PERCENTAGE) %>%
                     select(-Fertilizer_ID,-REGION)
 
-                   
+#Add annual PET and PRE to determine wet zone or dry zone
+PRE_PET_y <- PRE_PET %>%
+  mutate(PET_Y = GROW_PET + NGROW_PET,
+         PRE_Y = GROW_PRE + NGROW_PRE) %>%
+  select(STATE, COUNTY, PET_Y, PRE_Y)
+
+
 #Prepare the SiteData for US volatilization
 US_vola <- US_Direct %>%
-  select(STATE:PE) %>%
+  select(STATE:Fert_LCA_kg) %>%
+  left_join(PRE_PET_y, by = c("STATE", "COUNTY")) %>%
   left_join(Soil_percentage, by = c("STATE" = "State")) %>%
   left_join(Fert_form_method, by = c("STATE", "CROP", "CLASS"))
    
 
 #write.csv(US_vola, "Outputs/0.2_US_volatilization.csv", row.names = F) >1.2GB too large
-save(US_vola,file= "Outputs/0.2_US_volatilization.RData") #Only 10MB
+#save(US_vola,file= "Outputs/0.2_US_volatilization.RData") #Only 10MB
 ```
 
 

@@ -43,18 +43,19 @@ for (state_code in state_crosswalk$abbr) {
   ) %>% select(mukey, muacres)
 
   # Merge both datasets by mukey
-  soil_saturation_area <- left_join(saturation_data, area_data, by = "mukey")
+  soil_saturation_area <- left_join(saturation_data, area_data, by = "mukey") %>%
+                          mutate(pond = as.integer(pondfreqprs))
   
   #Filter data to find flood prone soils, but not flooded 
   saturation_prone_soils <- soil_saturation_area %>%
   filter(
-    wtdepaprjunmin <= 30 ,  # Shallow water table (≤30 cm)
+    #wtdepaprjunmin <= 30 ,  # Shallow water table (≤30 cm)
     drclassdcd %in% c("Poorly drained","Somewhat poorly drained", "Very poorly drained"),  
     # Low drainage capacity
-    hydclprs > 10,  # Hydric soils (likely to retain water) high
+    #hydclprs > 10,  # Hydric soils (likely to retain water) high
     #hydclprs > 40,  # Hydric soils (likely to retain water)  low
-    pondfreqprs <= 30  # No significant ponding (to exclude flooded soils) high
-    #pondfreqprs <= 10  # No significant ponding (to exclude flooded soils) low
+    #pond <= 30  # ponding percentage in the mapunit, 100 means all area is ponding, high
+    #pond <= 10  # No significant ponding (to exclude flooded soils) low
   )
 
   
@@ -78,6 +79,7 @@ for (state_code in state_crosswalk$abbr) {
   all_states_texture_summary <- bind_rows(all_states_texture_summary, state_texture_summary)
 }
 
+#Add state names to full names
 all_states_texture_summary <- all_states_texture_summary %>%
   left_join(state_crosswalk, by = c("State" = "abbr")) %>%
   select(-State) %>%
@@ -85,7 +87,7 @@ all_states_texture_summary <- all_states_texture_summary %>%
   mutate(State = toupper(State))
 
 #write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo_low.csv", row.names = FALSE)
-write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo_high.csv", row.names = FALSE)
+write.csv(all_states_texture_summary,"Outputs/2.2_Soil topo.csv", row.names = FALSE)
 
 ```
 
