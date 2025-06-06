@@ -16,7 +16,7 @@ The irrigation data in the US census have two parts, 1. total irrigated land in 
 Irrigation data is from Census 2017 and 2022. Since we'd like data from 2018-2022 (the average), I'm using their average to represent irrigation fraction for each crop in each state. 
 
 
-HOWEVER, in Canada's methodology, we assumed that irrigation occurs when PET < P. This means I can determine the irrigation proportion for target crops at county level. 
+HOWEVER, in Canada's methodology, we assumed that irrigation occurs when PET < P during growing season. This means I can determine the irrigation proportion for target crops at county level. If double cropping in the US, PER and P in the nongrowing season were used to determine the presence of irrigation. 
 
 Reconciling the two concepts! 
 
@@ -61,10 +61,10 @@ PRE_PET_NGS <- PRE_PET %>%
   mutate(IRRI_G = ifelse(RF_G >=1, "Y", "N"),
          IRRI_NG = ifelse(RF_NG >=1, "Y", "N")
          )
-# The results show that irrigation presence in growing or non growing seasons is sync. 
-# There is no place has irrigation in growing but not in non-growing.
+# The results show that irrigation presence in growing or non growing seasons is synced. 
+# There is no county has irrigation in growing but not in non-growing.
 
-#Calculate the irrigation percentage based on the T/F and area
+#Calculate the irrigation percentage based on the T/F and area at state level
 Irri_percent <- Agr_area %>%
   left_join(PRE_PET_NGS, by = c("State" = "STATE", "County" = "COUNTY")) %>%
   select(-RF_G, -RF_NG) %>%
@@ -90,27 +90,61 @@ After the filter, sum of "VALUE" is the total area (acre) for the crop in the st
 ```{r area data}
 #To filter the total area data in 2022 and 2017
 data_area_2022 <- data_2022 %>%
-  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
-  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
-  filter(UNIT_DESC == "ACRES") %>%
-  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(SECTOR_DESC == "CROPS") %>%
   filter(AGG_LEVEL_DESC == "STATE") %>%
-  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
-  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
-  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+    mutate(
+    expected_desc = case_when(
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC != "ALL CLASSES" ~ 
+        str_c("WHEAT, ", CLASS_DESC, " - ACRES HARVESTED"),
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC == "ALL CLASSES" ~
+        NA_character_,                                    # <- drop sum of wheat (spring, durum, winter)
+      COMMODITY_DESC %in% c("CORN","SORGHUM")  & UTIL_PRACTICE_DESC %in% c("GRAIN", "SILAGE") ~
+        str_c(COMMODITY_DESC, ", ", UTIL_PRACTICE_DESC, " - ACRES HARVESTED"),
+      COMMODITY_DESC == "PEAS" & CLASS_DESC == "DRY EDIBLE" ~ 
+        str_c("PEAS, ", CLASS_DESC, " - ACRES HARVESTED"), #only dry used to biofuel
+      TRUE ~ str_c(COMMODITY_DESC, " - ACRES HARVESTED")
+    )
+  ) %>%
+  filter(SHORT_DESC == expected_desc) %>% 
+  #select(-expected_desc) %>%  # optional: drop the helper column
+  ungroup() %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "TOTAL") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>% #keep numeric data only, remove D
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%    #convert to numeric
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME, DOMAIN_DESC) %>%
   summarise(Area_tot = sum(Area_tot))
+
   
 
 data_area_2017 <- data_2017 %>%
-  filter(PRODN_PRACTICE_DESC == "ALL PRODUCTION PRACTICES") %>%
-  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
-  filter(UNIT_DESC == "ACRES") %>%
-  filter(DOMAIN_DESC == "AREA OPERATED") %>%
+  filter(SECTOR_DESC == "CROPS") %>%
   filter(AGG_LEVEL_DESC == "STATE") %>%
-  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
-  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
-  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
+  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
+    mutate(
+    expected_desc = case_when(
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC != "ALL CLASSES" ~ 
+        str_c("WHEAT, ", CLASS_DESC, " - ACRES HARVESTED"),
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC == "ALL CLASSES" ~
+        NA_character_,                                    # <- drop sum of wheat (spring, durum, winter)
+      COMMODITY_DESC %in% c("CORN","SORGHUM")  & UTIL_PRACTICE_DESC %in% c("GRAIN", "SILAGE") ~
+        str_c(COMMODITY_DESC, ", ", UTIL_PRACTICE_DESC, " - ACRES HARVESTED"),
+      COMMODITY_DESC == "PEAS" & CLASS_DESC == "DRY EDIBLE" ~ 
+        str_c("PEAS, ", CLASS_DESC, " - ACRES HARVESTED"), #only dry used to biofuel
+      TRUE ~ str_c(COMMODITY_DESC, " - ACRES HARVESTED")
+    )
+  ) %>%
+  filter(SHORT_DESC == expected_desc) %>% 
+  #select(-expected_desc) %>%  # optional: drop the helper column
+  ungroup() %>%
+  filter(UNIT_DESC == "ACRES") %>%
+  filter(DOMAIN_DESC == "TOTAL") %>%
+  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>% #keep numeric data only, remove D
+  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%    #convert to numeric
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME, DOMAIN_DESC) %>%
   summarise(Area_tot = sum(Area_tot))
+
 
 ```
 
@@ -119,53 +153,135 @@ data_area_2017 <- data_2017 %>%
 
 ``` {r irrigation area}
 #To filter the irrigation data in 2022 and 2017
-data_Irri_2022 <- data_2022 %>%
-  filter(PRODN_PRACTICE_DESC == "IRRIGATED") %>%
-  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
-  filter(UNIT_DESC %in% c("ACRES")) %>% 
-  filter(DOMAIN_DESC == "AREA HARVESTED") %>%
-  filter(AGG_LEVEL_DESC == "STATE") %>%
-  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
-  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
-  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
-  summarise(Area_tot = sum(Area_tot)) %>%
+data_Irri_2022 <- data_2022 %>% 
+  filter(
+    SECTOR_DESC       == "CROPS",
+    AGG_LEVEL_DESC    == "STATE",
+    STATISTICCAT_DESC == "AREA HARVESTED",
+    PRODN_PRACTICE_DESC == "IRRIGATED"    
+  ) %>% 
+  mutate(
+    expected_desc = case_when(
+      # Wheat: keep Winter / Durum / Spring only
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC != "ALL CLASSES" ~
+        str_c("WHEAT, ", CLASS_DESC, ", IRRIGATED - ACRES HARVESTED"),
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC == "ALL CLASSES" ~
+      NA_character_,                      # ← mark rows to discard
+      # Corn & Sorghum: keep Grain + Silage only
+      COMMODITY_DESC %in% c("CORN", "SORGHUM") &
+        UTIL_PRACTICE_DESC %in% c("GRAIN", "SILAGE") ~
+        str_c(COMMODITY_DESC, ", ", UTIL_PRACTICE_DESC, 
+              ", IRRIGATED - ACRES HARVESTED"),
+      # Peas: only Dry-edible
+      COMMODITY_DESC == "PEAS" & CLASS_DESC == "DRY EDIBLE" ~
+        str_c("PEAS, ", CLASS_DESC, ", IRRIGATED - ACRES HARVESTED"),
+      # All other crops
+      TRUE ~ str_c(COMMODITY_DESC, ", IRRIGATED - ACRES HARVESTED")
+    )
+  ) %>% 
+  filter(SHORT_DESC == expected_desc) %>% 
+  filter(
+    UNIT_DESC   == "ACRES",
+    DOMAIN_DESC == "TOTAL"        # matches irrigated rows
+  ) %>% 
+  mutate(
+    Area_irr = ifelse(grepl("^\\(", VALUE), 0, VALUE),  # drop “(D)” etc.
+    Area_irr = as.numeric(gsub(",", "", Area_irr))
+  ) %>% 
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>% 
+  summarise(Area_irr = sum(Area_irr), .groups = "drop") %>%
   mutate(SHORT_DESC = str_remove(SHORT_DESC, ",\\s*IRRIGATED") %>%  # drop the phrase
                  str_trim())                                      # clean up any spaces
 
 
 
-data_Irri_2017 <- data_2017 %>%
-  filter(PRODN_PRACTICE_DESC == "IRRIGATED") %>%
-  filter(STATISTICCAT_DESC == "AREA HARVESTED") %>%
-  filter(UNIT_DESC %in% c("ACRES")) %>% 
-  filter(DOMAIN_DESC == "AREA OPERATED") %>%
-  filter(AGG_LEVEL_DESC == "STATE") %>%
-  mutate(Area_tot = ifelse(grepl("^\\(", VALUE), 0, VALUE)) %>%
-  mutate(Area_tot = as.numeric(gsub(",", "", Area_tot))) %>%   
-  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>%
-  summarise(Area_tot = sum(Area_tot)) %>%
+data_Irri_2017 <- data_2017 %>% 
+  filter(
+    SECTOR_DESC       == "CROPS",
+    AGG_LEVEL_DESC    == "STATE",
+    STATISTICCAT_DESC == "AREA HARVESTED",
+    PRODN_PRACTICE_DESC == "IRRIGATED"    
+  ) %>% 
+  mutate(
+    expected_desc = case_when(
+      # Wheat: keep Winter / Durum / Spring only
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC != "ALL CLASSES" ~
+        str_c("WHEAT, ", CLASS_DESC, ", IRRIGATED - ACRES HARVESTED"),
+      COMMODITY_DESC == "WHEAT" & CLASS_DESC == "ALL CLASSES" ~
+      NA_character_,                      # ← mark rows to discard
+      # Corn & Sorghum: keep Grain + Silage only
+      COMMODITY_DESC %in% c("CORN", "SORGHUM") &
+        UTIL_PRACTICE_DESC %in% c("GRAIN", "SILAGE") ~
+        str_c(COMMODITY_DESC, ", ", UTIL_PRACTICE_DESC, 
+              ", IRRIGATED - ACRES HARVESTED"),
+      # Peas: only Dry-edible
+      COMMODITY_DESC == "PEAS" & CLASS_DESC == "DRY EDIBLE" ~
+        str_c("PEAS, ", CLASS_DESC, ", IRRIGATED - ACRES HARVESTED"),
+      # All other crops
+      TRUE ~ str_c(COMMODITY_DESC, ", IRRIGATED - ACRES HARVESTED")
+    )
+  ) %>% 
+  filter(SHORT_DESC == expected_desc) %>% 
+  filter(
+    UNIT_DESC   == "ACRES",
+    DOMAIN_DESC == "TOTAL"        # matches irrigated rows
+  ) %>% 
+  mutate(
+    Area_irr = ifelse(grepl("^\\(", VALUE), 0, VALUE),  # drop “(D)” etc.
+    Area_irr = as.numeric(gsub(",", "", Area_irr))
+  ) %>% 
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>% 
+  summarise(Area_irr = sum(Area_irr), .groups = "drop") %>%
   mutate(SHORT_DESC = str_remove(SHORT_DESC, ",\\s*IRRIGATED") %>%  # drop the phrase
                  str_trim())                                      # clean up any spaces
 
-#Join the data to determine irrigation fraction
+
+#Join the data to determine irrigation fraction and merge silage and grain corn
 Frac_irri_2022 <- data_area_2022 %>%
   left_join(data_Irri_2022, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC")) %>%
-  mutate(Frac_irri = Area_tot.y/Area_tot.x)
+  mutate(
+    SHORT_DESC = str_replace(
+      SHORT_DESC,
+      "^(CORN|SORGHUM),\\s*(GRAIN|SILAGE)\\s*-\\s*ACRES HARVESTED$",
+      "\\1 - ACRES HARVESTED"
+    )
+  ) %>% 
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>% 
+  summarise(
+    Area_tot = sum(Area_tot,  na.rm = TRUE),
+    Area_irr = sum(Area_irr,  na.rm = TRUE),
+    .groups  = "drop"
+  ) %>%
+  mutate(Frac_irri = ifelse(Area_irr/Area_tot > 1, 1, Area_irr/Area_tot))
+
+
+
+
+
 
 Frac_irri_2017 <- data_area_2017 %>%
-  left_join(data_Irri_2017, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC")) %>%
-  mutate(Frac_irri = Area_tot.y/Area_tot.x)
+  left_join(data_Irri_2022, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC")) %>%
+  mutate(
+    SHORT_DESC = str_replace(
+      SHORT_DESC,
+      "^(CORN|SORGHUM),\\s*(GRAIN|SILAGE)\\s*-\\s*ACRES HARVESTED$",
+      "\\1 - ACRES HARVESTED"
+    )
+  ) %>% 
+  group_by(COMMODITY_DESC, SHORT_DESC, STATE_NAME) %>% 
+  summarise(
+    Area_tot = sum(Area_tot,  na.rm = TRUE),
+    Area_irr = sum(Area_irr,  na.rm = TRUE),
+    .groups  = "drop"
+  ) %>%
+  mutate(Frac_irri = ifelse(Area_irr/Area_tot > 1, 1, Area_irr/Area_tot))
 
 
 # Join the two census data (note that some crops didn't have irrigation in 2017)
 Frac_irri <- Frac_irri_2022 %>%
   left_join(Frac_irri_2017, by = c("COMMODITY_DESC", "STATE_NAME", "SHORT_DESC"))%>%
   rename(
-    Area_tot_2022  = Area_tot.x.x,
-    Area_irri_2022 = Area_tot.y.x,
     Frac_irri_2022 = Frac_irri.x,
-    Area_tot_2017  = Area_tot.x.y,
-    Area_irri_2017 = Area_tot.y.y,
     Frac_irri_2017 = Frac_irri.y
   ) %>% 
   # turn every NA **or** NaN in numeric columns into 0
@@ -189,7 +305,8 @@ Frac_irri_recon <- Frac_irri %>%
     
     # 2 ─ classify the row
     conflict_class = case_when(
-      mean_17_22  ==   0           ~ "OK",           # mean no irrigation even PET > PRE
+      mean_17_22  == 0 & Irri_percent == 0           ~ "OK",           # mean no irrigation, agree by both methods
+      mean_17_22  == 0 & Irri_percent > 0           ~ "Partial",       # It possible that small/partial irrigation occur
       Irri_percent  <  mean_17_22  ~ "A_conflict",  # irri% lower than survey avg
       Irri_percent  >  mean_17_22  ~ "B_conflict",  # irri% higher than survey avg
       TRUE                         ~ "OK"
@@ -197,8 +314,9 @@ Frac_irri_recon <- Frac_irri %>%
     
     # 3 ─ generate the reconciled irrigation fraction
     Frac_irri_final = case_when(
+      conflict_class == "Partial"    ~ Irri_percent*0.5, # This is an arbitrary number.
       conflict_class == "A_conflict" ~ pmax(Frac_irri_2017, Frac_irri_2022, na.rm = TRUE),
-      conflict_class == "B_conflict" ~ Irri_percent,
+      conflict_class == "B_conflict" ~ (Irri_percent + mean_17_22)/2, #Our method could overestimate irrigation
       TRUE                           ~ mean_17_22     # keep the average when they agree
     )) %>%
    mutate(
@@ -206,7 +324,7 @@ Frac_irri_recon <- Frac_irri %>%
    select(COMMODITY_DESC,SHORT_DESC,STATE_NAME,Frac_IRRI) %>%
    rename(STATE = STATE_NAME)  
 
-#write.csv(Frac_irri_recon, "Outputs/1.4_Irrigation fraction.csv",row.names=FALSE)
+write.csv(Frac_irri_recon, "Outputs/1.4_Irrigation fraction.csv",row.names=FALSE)
 
 ```
 
