@@ -324,6 +324,9 @@ Frac_irri_recon <- Frac_irri %>%
    select(COMMODITY_DESC,SHORT_DESC,STATE_NAME,Frac_IRRI) %>%
    rename(STATE = STATE_NAME)  
 
+#Create a CropID t
+
+
 write.csv(Frac_irri_recon, "Outputs/1.4_Irrigation fraction.csv",row.names=FALSE)
 
 ```
