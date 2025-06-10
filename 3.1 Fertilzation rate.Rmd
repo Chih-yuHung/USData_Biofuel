@@ -113,8 +113,8 @@ Production_percentage <- function(data, crop_class) {
   # Filter the dataset for the specified crop and relevant conditions
   filtered_data <- data %>%
     filter(COMMODITY_DESC == crop) %>%
-    filter((COMMODITY_DESC != "CORN") | (COMMODITY_DESC == "CORN" & UTIL_PRACTICE_DESC == "GRAIN")) %>%
-    filter((COMMODITY_DESC != "SORGHUM") | (COMMODITY_DESC == "SORGHUM" & UTIL_PRACTICE_DESC == "GRAIN")) %>%
+    filter((COMMODITY_DESC != "CORN") | (COMMODITY_DESC == "CORN" & UTIL_PRACTICE_DESC %in% c("GRAIN","SILAGE"))) %>%
+    filter((COMMODITY_DESC != "SORGHUM") | (COMMODITY_DESC == "SORGHUM" & UTIL_PRACTICE_DESC %in% c("GRAIN","SILAGE"))) %>%
     filter((COMMODITY_DESC != "PEAS") | (COMMODITY_DESC == "PEAS" & CLASS_DESC == "DRY EDIBLE")) %>%
     filter(STATISTICCAT_DESC == "PRODUCTION") %>%
     filter(AGG_LEVEL_DESC %in% c("NATIONAL", "STATE")) %>%

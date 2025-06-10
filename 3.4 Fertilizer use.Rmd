@@ -74,7 +74,7 @@ Fertilizer_County_Crop <- Area_County_Crop %>%
 
 
 
-write.csv(Fertilizer_County_Crop, "Outputs/3.4_Fertilizer_Use_County_Crop.csv", row.names = FALSE)
+#write.csv(Fertilizer_County_Crop, "Outputs/3.4_Fertilizer_Use_County_Crop.csv", row.names = FALSE)
 ```
 
 

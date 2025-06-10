@@ -109,6 +109,6 @@ all_states_texture_summary <- all_states_texture_summary %>%
   mutate(State = toupper(State))
 
 
-write.csv(all_states_texture_summary,"Outputs/2.1_Soil texture.csv", row.names = FALSE)
+#write.csv(all_states_texture_summary,"Outputs/2.1_Soil texture.csv", row.names = FALSE)
 ```
 
