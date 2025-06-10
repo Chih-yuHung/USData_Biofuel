@@ -25,16 +25,23 @@ This file is used to prepare SiteData that will got to estimate N2O EF and SOC E
 #Prepare the P and PE for crops 
 US_Direct <- Fert_County_Crop %>%
   left_join(PRE_PET, by = c("STATE", "COUNTY")) %>%
+  #Some crops in some states are usually sown in fall so their growing season is between Oct-April or Nov-May
   mutate(
     P = case_when(
-      DOUBLE == "N" ~ GROW_PRE,
-      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PRE,
-      TRUE ~ GROW_PRE
+      CROP == "CANOLA"  & STATE %in% c("OKLAHOMA", "KANSAS", "CALIFORNIA", "TEXAS") ~ NGROW_PRE,  
+      CROP %in% c("CAMELINA", "BARLEY") & STATE == "CALIFORNIA"               ~ NGROW_PRE,
+      CROP == "RYE"     & STATE == "NORTH DAKOTA"                             ~ NGROW_PRE,
+      str_detect(CLASS, regex("^winter", ignore_case = TRUE))       ~ NGROW_PRE,
+      CROP == "TRITICALE" & DOUBLE == "Y"                           ~ NGROW_PRE,
+      TRUE                                                          ~ GROW_PRE
     ),
     PE = case_when(
-      DOUBLE == "N" ~ GROW_PET,
-      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PET,
-      TRUE ~ GROW_PET
+      CROP == "CANOLA"  & STATE %in% c("OKLAHOMA", "KANSAS", "CALIFORNIA", "TEXAS") ~ NGROW_PET,  
+      CROP %in% c("CAMELINA", "BARLEY") & STATE == "CALIFORNIA"               ~ NGROW_PET,
+      CROP == "RYE"     & STATE == "NORTH DAKOTA"                             ~ NGROW_PET,
+      str_detect(CLASS, regex("^wint", ignore_case = TRUE))         ~ NGROW_PET,
+      CROP == "TRITICALE" & DOUBLE == "Y"                           ~ NGROW_PET,
+      TRUE                                                          ~ GROW_PET
     )
   ) %>%
   left_join(Topo, by = c("STATE" = "State")) %>%
@@ -123,16 +130,22 @@ US_vola <- US_Direct %>%
 #Prepare the P and PE for crops 
 US_leaching <- Fert_County_Crop %>%
   left_join(PRE_PET, by = c("STATE", "COUNTY")) %>%
-  mutate(
+   mutate(
     P = case_when(
-      DOUBLE == "N" ~ GROW_PRE,
-      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PRE,
-      TRUE ~ GROW_PRE
+      CROP == "CANOLA"  & STATE %in% c("OKLAHOMA", "KANSAS", "CALIFORNIA", "TEXAS") ~ NGROW_PRE,  
+      CROP %in% c("CAMELINA", "BARLEY") & STATE == "CALIFORNIA"               ~ NGROW_PRE,
+      CROP == "RYE"     & STATE == "NORTH DAKOTA"                             ~ NGROW_PRE,
+      str_detect(CLASS, regex("^winter", ignore_case = TRUE))       ~ NGROW_PRE,
+      CROP == "TRITICALE" & DOUBLE == "Y"                           ~ NGROW_PRE,
+      TRUE                                                          ~ GROW_PRE
     ),
     PE = case_when(
-      DOUBLE == "N" ~ GROW_PET,
-      DOUBLE == "Y" & (CLASS == "WINTER" | CROP == "TRITICALE") ~ NGROW_PET,
-      TRUE ~ GROW_PET
+      CROP == "CANOLA"  & STATE %in% c("OKLAHOMA", "KANSAS", "CALIFORNIA", "TEXAS") ~ NGROW_PET,  
+      CROP %in% c("CAMELINA", "BARLEY") & STATE == "CALIFORNIA"               ~ NGROW_PET,
+      CROP == "RYE"     & STATE == "NORTH DAKOTA"                             ~ NGROW_PET,
+      str_detect(CLASS, regex("^wint", ignore_case = TRUE))         ~ NGROW_PET,
+      CROP == "TRITICALE" & DOUBLE == "Y"                           ~ NGROW_PET,
+      TRUE                                                          ~ GROW_PET
     )
   ) %>%
   select(STATE, COUNTY, YEAR, CROP, CLASS, DOUBLE, Fert_LCA_kg, P, PE)
