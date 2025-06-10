@@ -315,7 +315,7 @@ Frac_irri_recon <- Frac_irri %>%
     # 3 ─ generate the reconciled irrigation fraction
     Frac_irri_final = case_when(
       conflict_class == "Partial"    ~ Irri_percent*0.5, # This is an arbitrary number.
-      conflict_class == "A_conflict" ~ pmax(Frac_irri_2017, Frac_irri_2022, na.rm = TRUE),
+      conflict_class == "A_conflict" ~ mean_17_22, #Use the  average when survey avg showed higher than our estimate
       conflict_class == "B_conflict" ~ (Irri_percent + mean_17_22)/2, #Our method could overestimate irrigation
       TRUE                           ~ mean_17_22     # keep the average when they agree
     )) %>%
@@ -324,7 +324,20 @@ Frac_irri_recon <- Frac_irri %>%
    select(COMMODITY_DESC,SHORT_DESC,STATE_NAME,Frac_IRRI) %>%
    rename(STATE = STATE_NAME)  
 
-#Create a CropID t
+#Create a CropID to join the Direct data later
+Frac_irri_recon <- Frac_irri_recon %>% 
+  mutate(tmp = str_remove(SHORT_DESC, "\\s*-\\s*ACRES HARVESTED$") %>%
+               str_remove(",\\s*DRY EDIBLE") %>%                 
+               str_trim()) %>% 
+  mutate(
+    CropID = case_when(
+      str_detect(tmp, "^WHEAT,\\s*SPRING,\\s*\\(EXCL DURUM\\)$") ~ "Wheat(spring)",
+      str_detect(tmp, "^WHEAT,\\s*SPRING,\\s*DURUM$")            ~ "Wheat(durum)",
+      str_detect(tmp, "^WHEAT,\\s*WINTER$")                      ~ "Wheat(winter)",
+      TRUE                                                      ~ str_to_sentence(tmp)
+    )
+  ) %>% 
+  select(-tmp)   # drop the helper column
 
 
 write.csv(Frac_irri_recon, "Outputs/1.4_Irrigation fraction.csv",row.names=FALSE)
