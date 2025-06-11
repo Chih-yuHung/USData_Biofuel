@@ -1,0 +1,70 @@
+---
+title: "1.5 PRE and PET state level"
+author: "Dr. Chih-Yu Hung"
+date: "2025-06-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+source("setup.R")
+PRE_PET <- read.csv("Outputs/1.2_PET&PRE_County_30y.csv")
+Fert_County <-read.csv("Outputs/3.5_Fertilizer_County_1822.csv")
+```
+
+## PRE and PET state level
+
+```{r merge data}
+#Wrangle necessary data
+Fert_County <- Fert_County %>%
+ left_join(state_crosswalk, by = c("State" = "abbr")) %>%
+  mutate(STATE = toupper(full),
+         FarmN_Avg = rowMeans(select(., farmN2018:farmN2022), na.rm = TRUE)) %>%
+  select(STATE,County, FarmN_Avg) %>%
+  mutate(County = str_to_lower(County))
+
+#County name cleaning
+clean_county <- function(name) {
+  name %>%
+    tolower() %>%
+    str_replace_all("\\.", "") %>%                     # remove periods
+    str_replace_all("st ", "saint ") %>%               # unify st. to saint
+    str_replace_all("st\\b", "saint") %>%              # st at end of word
+    str_replace_all("\\s+", " ") %>%                   # collapse multiple spaces
+    str_replace_all("[^a-z ]", "") %>%                 # remove punctuation
+    str_trim()                                         # trim leading/trailing spaces
+}
+Fert_County <- Fert_County %>%
+  mutate(County = clean_county(County))
+PRE_PET <- PRE_PET %>%
+  mutate(County = clean_county(COUNTY))
+
+#left join the two data and summarise to obtain fertilizer-weighted GROW_PRE, GROW_PET and ANNUAL_PRE, ANNUAL_PET
+PRE_PET_FERT <- Fert_County %>%
+  left_join(PRE_PET, by = c("STATE", "County")) %>%
+  drop_na() %>%
+  mutate(ANNUAL_PRE = GROW_PRE + NGROW_PRE,
+         ANNUAL_PET = GROW_PET + NGROW_PET)
+
+
+# List of columns to process
+vars <- c("GROW_PRE", "GROW_PET", "ANNUAL_PRE", "ANNUAL_PET")
+
+# Simple averages
+simple_avg <- PRE_PET_FERT %>%
+  group_by(STATE) %>%
+  summarise(across(all_of(vars), mean, na.rm = TRUE), .groups = "drop")
+
+# Weighted averages (based on fertilizer use)
+weighted_avg <- PRE_PET_FERT %>%
+  group_by(STATE) %>%
+  summarise(across(all_of(vars), ~ sum(.x * FarmN_Avg, na.rm = TRUE) / sum(FarmN_Avg, na.rm = TRUE)),
+            .groups = "drop")
+
+# Merge results
+summary_avg <- left_join(simple_avg, weighted_avg, by = "STATE", suffix = c("_avg", "_wavg"))
+
+
+#write.csv(summary_avg, "Outputs/1.5_PET&PRE_State_30y.csv",row.names = FALSE)
+
+```
