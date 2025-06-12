@@ -20,11 +20,17 @@ I use the data for estimating direct emissions
 
 
 ```{r PRE and PET for US states}
-PRE_PET <- PRE_PET %>%
-  
+PRE_PET_AVG <- PRE_PET %>%
+  group_by(STATE, COUNTY, CROP, CLASS, DOUBLE, P, PE) %>%
+  summarise(Fert_LCA_kg = mean(Fert_LCA_kg)) %>%
+  ungroup()%>%
+  group_by(STATE) %>%
+  summarise(GROW_PRE_avg  = mean(P), 
+            GROW_PET_avg  = mean(PE),
+            GROW_PRE_wavg = sum(P*Fert_LCA_kg)/sum(Fert_LCA_kg),
+            GROW_PET_wavg = sum(PE*Fert_LCA_kg)/sum(Fert_LCA_kg))
 
-
-
+#write.csv(PRE_PET_AVG, "Outputs/1.5_PET&PRE_State_30y.csv",row.names = FALSE)
 ```
 
 
