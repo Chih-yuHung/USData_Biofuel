@@ -8,13 +8,32 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 source("setup.R")
-PRE_PET <- read.csv("Outputs/1.2_PET&PRE_County_30y.csv")
-Fert_County <-read.csv("Outputs/3.5_Fertilizer_County_1822.csv")
+#PRE_PET <- read.csv("Outputs/1.2_PET&PRE_County_30y.csv")
+#Fert_County <-read.csv("Outputs/3.5_Fertilizer_County_1822.csv")
+
+PRE_PET <- read.csv("Outputs/0.1_US_Direct.csv")
 ```
 
-## PRE and PET state level
+## PRE and PET State level 
 
-```{r merge data}
+I use the data for estimating direct emissions
+
+
+```{r PRE and PET for US states}
+PRE_PET <- PRE_PET %>%
+  
+
+
+
+```
+
+
+
+## PRE and PET state level (Abandoned)
+
+This method doesn't consider some crop grows in nongrowing season and could misestimate precipitation and potential evapotranspiration. 
+
+```{r merge data, eval = FALSE}
 #Wrangle necessary data
 Fert_County <- Fert_County %>%
  left_join(state_crosswalk, by = c("State" = "abbr")) %>%
