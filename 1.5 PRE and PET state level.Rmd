@@ -65,7 +65,7 @@ weighted_avg <- PRE_PET_FERT %>%
 summary_avg <- left_join(simple_avg, weighted_avg, by = "STATE", suffix = c("_avg", "_wavg"))
 #withou annual data
 summary_avg_Grow <- summary_avg %>%
-  select(-ANNUAL_PRE_avg,-ANNUAL_PET_avg,-ANNUAL_PRE_wavg,-ANNUAL_PRE_wavg)
+  select(-ANNUAL_PRE_avg,-ANNUAL_PET_avg,-ANNUAL_PRE_wavg,-ANNUAL_PET_wavg)
 
 #write.csv(summary_avg_Grow, "Outputs/1.5_PET&PRE_State_30y.csv",row.names = FALSE)
 #write.csv(summary_avg, "Outputs/1.5_PET&PRE_State_30y_with annual.csv",row.names = FALSE)
