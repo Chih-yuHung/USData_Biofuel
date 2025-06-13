@@ -1,8 +1,17 @@
 .Rproj.user
 .Rhistory
-.RData
+*.RData
 .Ruserdata
 *.html
-.pdf
-.xlsx
-.csv
+*.pdf
+*.xlsx
+*.csv
+Fertilizer/
+Soil/
+Quickstat QA/
+qs.census2017.txt/
+qs.environmental_20250114.txt/
+CEAP/
+Climate Normals/
+temporary/
+
